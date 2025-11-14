@@ -165,6 +165,7 @@ export interface IdentifiedAccessory {
 }
 
 export interface InstrumentIdentificationResult {
+  projectName?: string;
   instruments: IdentifiedInstrument[];
   accessories?: IdentifiedAccessory[];
   summary: string;
