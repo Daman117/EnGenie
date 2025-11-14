@@ -46,6 +46,7 @@ const Project = () => {
   const [activeTab, setActiveTab] = useState<string>('project');
   const [previousTab, setPreviousTab] = useState<string>('project');
   const [searchTabs, setSearchTabs] = useState<{ id: string; title: string; input: string }[]>([]);
+  const [projectName, setProjectName] = useState<string>('Project');
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, logout } = useAuth();
@@ -80,6 +81,11 @@ const Project = () => {
       setInstruments(response.instruments || []);
       setAccessories(response.accessories || []);
       setShowResults(true);
+      
+      // Set the project name from the API response, fallback to 'Project' if not provided
+      if (response.projectName) {
+        setProjectName(response.projectName);
+      }
 
       toast({
         title: "Success",
@@ -168,6 +174,7 @@ const Project = () => {
     setSearchTabs([]);
     setPreviousTab('project');
     setActiveTab('project');
+    setProjectName('Project'); // Reset project name to default
   };
 
   const handleSaveProject = () => {
@@ -247,7 +254,7 @@ const Project = () => {
                         value="project"
                         className="rounded-lg px-4 py-2 text-base font-bold text-foreground border-2 border-border data-[state=active]:shadow-md whitespace-nowrap flex-shrink-0"
                       >
-                        Project
+                        {projectName}
                       </TabsTrigger>
                       {searchTabs.map((tab, index) => (
                         <div key={tab.id} className="flex items-center min-w-0 flex-shrink">
