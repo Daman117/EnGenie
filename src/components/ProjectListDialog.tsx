@@ -58,9 +58,10 @@ interface Project {
 interface ProjectListDialogProps {
   children: React.ReactNode;
   onProjectSelect: (projectId: string) => void;
+  onProjectDelete?: (deletedProjectId: string) => void;
 }
 
-const ProjectListDialog: React.FC<ProjectListDialogProps> = ({ children, onProjectSelect }) => {
+const ProjectListDialog: React.FC<ProjectListDialogProps> = ({ children, onProjectSelect, onProjectDelete }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -117,9 +118,14 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({ children, onProje
         prevProjects.filter(project => project.id !== projectId)
       );
 
+      // Notify parent component about the deletion
+      if (onProjectDelete) {
+        onProjectDelete(projectId);
+      }
+
       toast({
         title: "Project Deleted",
-        description: `"${projectName}" has been deleted successfully from MongoDB`,
+        description: `"${projectName}" has been permanently deleted from MongoDB`,
       });
 
     } catch (error: any) {
