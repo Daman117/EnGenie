@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Send, Loader2, Play, Bot, LogOut, Mail, Upload, Save, FolderOpen, FileText, X } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
+import { BASE_URL } from '../components/AIRecommender/api';
 import { identifyInstruments, validateRequirements } from '@/components/AIRecommender/api';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -344,7 +345,7 @@ const Project = () => {
       // This ensures we can prompt even if the backend does not enforce unique names.
       if (!options?.skipDuplicateDialog) {
         try {
-          const listResponse = await fetch('/api/projects', {
+          const listResponse = await fetch(`${BASE_URL}/api/projects`, {
             credentials: 'include'
           });
 
@@ -466,7 +467,7 @@ const Project = () => {
         hasUserInteractions: !!projectData.user_interactions
       });
 
-      const response = await fetch('/api/projects/save', {
+      const response = await fetch(`${BASE_URL}/api/projects/save`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -541,7 +542,7 @@ const Project = () => {
           // Compute smarter suggestion based on existing projects
           let suggested = `${nameFromError} (1)`;
           try {
-            const listResp = await fetch('/api/projects', { credentials: 'include' });
+            const listResp = await fetch(`${BASE_URL}/api/projects`, { credentials: 'include' });
             if (listResp.ok) {
               const listData = await listResp.json();
               suggested = computeNextDuplicateName(nameFromError, listData.projects || []);
@@ -593,7 +594,7 @@ const Project = () => {
 
   const handleOpenProject = async (projectId: string) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}`, {
+      const response = await fetch(`${BASE_URL}/api/projects/${projectId}`, {
         credentials: 'include'
       });
 
@@ -873,7 +874,7 @@ const Project = () => {
     let suggested = autoRenameSuggestion || `${baseName} (1)`;
     try {
       // Try to compute next available suggestion based on existing projects
-      const listResp = await fetch('/api/projects', { credentials: 'include' });
+      const listResp = await fetch(`${BASE_URL}/api/projects`, { credentials: 'include' });
       if (listResp.ok) {
         const listData = await listResp.json();
         suggested = computeNextDuplicateName(baseName, listData.projects || []);
