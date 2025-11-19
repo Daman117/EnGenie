@@ -1072,23 +1072,34 @@ const Project = () => {
             </Tooltip>
 
             <ProjectListDialog onProjectSelect={handleOpenProject} onProjectDelete={handleProjectDelete}>
-              <Button variant="outline" size="sm" className="rounded-lg p-2">
-                <FolderOpen className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" className="rounded-lg p-2" title="Open">
+                    <FolderOpen className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Open</p></TooltipContent>
+              </Tooltip>
             </ProjectListDialog>
 
             {/* Profile */}
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="text-sm font-semibold text-muted-foreground hover:bg-secondary/50 p-2"
-                >
-                  <div className="w-7 h-7 rounded-full bg-ai-primary flex items-center justify-center text-white font-bold">
-                    {profileButtonLabel.charAt(0)}
-                  </div>
-                </Button>
-              </DropdownMenuTrigger>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="text-sm font-semibold text-muted-foreground hover:bg-secondary/50 p-2"
+                      // title={profileButtonLabel}
+                    >
+                      <div className="w-7 h-7 rounded-full bg-ai-primary flex items-center justify-center text-white font-bold">
+                        {profileButtonLabel.charAt(0)}
+                      </div>
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                  <TooltipContent><p>Profile</p></TooltipContent>    
+              </Tooltip>
               <DropdownMenuContent
                 className="w-56 bg-popover rounded-xl shadow-xl border border-border mt-1"
                 align="end"
