@@ -1235,7 +1235,7 @@ const Project = () => {
                 value={requirements}
                 onChange={(e) => setRequirements(e.target.value)}
                 onKeyDown={handleKeyPress}
-                className={`text-base resize-none rounded-xl bg-secondary/50 border-2 border-gray-600 focus:border-gray-600 focus:ring-0 focus:ring-offset-0 focus:outline-none focus:shadow-none hover:border-gray-600 active:border-gray-600 [&:focus]:!border-gray-600 [&:focus]:!ring-0 [&:focus]:!ring-offset-0 [&:focus]:!shadow-none [&:focus]:!outline-none ${showResults ? 'min-h-[160px]' : 'min-h-[400px]'}`}
+                className={`text-base resize-none rounded-xl bg-white border-2 border-gray-600 focus:border-gray-600 focus:ring-0 focus:ring-offset-0 focus:outline-none focus:shadow-none hover:border-gray-600 active:border-gray-600 [&:focus]:!border-gray-600 [&:focus]:!ring-0 [&:focus]:!ring-offset-0 [&:focus]:!shadow-none [&:focus]:!outline-none ${showResults ? 'min-h-[160px]' : 'min-h-[400px]'}`}
                 disabled={isLoading}
                 style={{ boxShadow: 'none' }}
               />
