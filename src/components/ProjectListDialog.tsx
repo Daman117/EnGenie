@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { Trash2, FileText, Loader2 } from 'lucide-react';
+import { BASE_URL } from './AIRecommender/api';
 import { useToast } from '@/hooks/use-toast';
 import { 
   AlertDialog, 
@@ -68,7 +69,7 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({ children, onProje
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/projects', {
+      const response = await fetch(`${BASE_URL}/api/projects`, {
         credentials: 'include'
       });
 
@@ -95,7 +96,7 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({ children, onProje
     try {
       console.log(`Deleting project ${projectId} (${projectName}) from MongoDB...`);
       
-      const response = await fetch(`/api/projects/${projectId}`, {
+      const response = await fetch(`${BASE_URL}/api/projects/${projectId}`, {
         method: 'DELETE',
         credentials: 'include'
       });
