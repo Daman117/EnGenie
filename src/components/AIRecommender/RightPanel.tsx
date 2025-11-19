@@ -95,6 +95,7 @@ export type RightPanelProps = {
   requirementSchema?: RequirementSchema;
   isDocked: boolean;
   setIsDocked: React.Dispatch<React.SetStateAction<boolean>>;
+  onPricingDataUpdate?: (priceReviewMap: Record<string, PriceReview>) => void;
 };
 
 // PriceReviewResult now includes the 'link' name as nullable
@@ -110,12 +111,13 @@ interface PriceReview {
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
-  productType,
+  productType = "",
   analysisResult,
   validationResult,
   requirementSchema,
   isDocked,
   setIsDocked,
+  onPricingDataUpdate
 }) => {
   const [vendors, setVendors] = useState<VendorInfo[]>([]);
   const [hoveredImage, setHoveredImage] = useState<string | null>(null);
@@ -125,6 +127,13 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const [imageGalleryOpen, setImageGalleryOpen] = useState<{ images: ProductImage[]; productName: string } | null>(null);
   const hasAutoUndocked = useRef(false);
   const { toast } = useToast();
+
+  // Notify parent component when pricing data updates
+  useEffect(() => {
+    if (onPricingDataUpdate && Object.keys(priceReviewMap).length > 0) {
+      onPricingDataUpdate(priceReviewMap);
+    }
+  }, [priceReviewMap, onPricingDataUpdate]);
 
   type FeedbackType = "positive" | "negative" | null;
   interface FeedbackEntry {
@@ -163,7 +172,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
     }
     setFeedbackState((prev) => ({ ...prev, [key]: { ...entry, loading: true } }));
     try {
-      const response = await submitFeedbackApi(entry.type ?? null, `[${vendor} - ${productName}] ${entry.comment ?? ""}`);
+      // Try to include projectId from analysisResult if available so backend can attach feedback to project
+      const projectId = (analysisResult as any)?.projectId || (analysisResult as any)?.project_id || undefined;
+      const response = await submitFeedbackApi(entry.type ?? null, `[${vendor} - ${productName}] ${entry.comment ?? ""}`, projectId);
       setFeedbackState((prev) => ({ ...prev, [key]: { ...entry, loading: false, submitted: true, response } }));
       toast({ title: "Thanks for your feedback!" });
     } catch (err: any) {
@@ -256,38 +267,53 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
     const matchedProducts = analysisResult.overallRanking.rankedProducts.filter((product) => product.requirementsMatch === true);
 
-    const fetchPromises = matchedProducts.map((product) => {
+    // Build a priceReviewMap but prefer embedded pricing in saved project data
+    const map: Record<string, PriceReview> = {};
+    matchedProducts.forEach((product) => {
       const key = `${product.vendor}-${product.productName}`;
-      return getProductPriceReview(product.productName)
-        .then((data: any) => {
-          const normalizedResults: PriceReviewResult[] = (data?.results ?? []).map((r: any) => ({
-            price: r.price ?? null,
-            reviews: r.reviews ?? null,
-            source: r.source ?? null,
-            link: r.link ?? null,
-          }));
+      // If product already contains pricing information (saved with project), use it
+      if ((product as any).price || (product as any).pricing || (product as any).priceReview) {
+        const embedded: PriceReviewResult[] = [];
+        if ((product as any).price) {
+          embedded.push({ price: (product as any).price, reviews: (product as any).reviews ?? null, source: 'embedded', link: null });
+        }
+        if ((product as any).pricing && Array.isArray((product as any).pricing.results)) {
+          (product as any).pricing.results.forEach((r: any) => embedded.push({ price: r.price ?? null, reviews: r.reviews ?? null, source: r.source ?? null, link: r.link ?? null }));
+        }
+        if ((product as any).priceReview && Array.isArray((product as any).priceReview.results)) {
+          (product as any).priceReview.results.forEach((r: any) => embedded.push({ price: r.price ?? null, reviews: r.reviews ?? null, source: r.source ?? null, link: r.link ?? null }));
+        }
 
-          const sortedResults = normalizedResults.sort((a, b) => {
-            const getNumericPrice = (price: string | null) => {
-              if (!price) return Infinity;
-              const match = price.match(/\d+([.,]\d+)?/);
-              return match ? parseFloat(match[0].replace(",", "")) : Infinity;
-            };
-            return getNumericPrice(a.price) - getNumericPrice(b.price);
+        map[key] = { results: embedded };
+      } else {
+        // Otherwise, attempt to fetch dynamically (fallback)
+        map[key] = { results: [] };
+        getProductPriceReview(product.productName)
+          .then((data: any) => {
+            const normalizedResults: PriceReviewResult[] = (data?.results ?? []).map((r: any) => ({
+              price: r.price ?? null,
+              reviews: r.reviews ?? null,
+              source: r.source ?? null,
+              link: r.link ?? null,
+            }));
+            // sort ascending price
+            const sortedResults = normalizedResults.sort((a, b) => {
+              const getNumericPrice = (price: string | null) => {
+                if (!price) return Infinity;
+                const match = price.match(/\d+([.,]\d+)?/);
+                return match ? parseFloat(match[0].replace(",", "")) : Infinity;
+              };
+              return getNumericPrice(a.price) - getNumericPrice(b.price);
+            });
+            setPriceReviewMap(prev => ({ ...prev, [key]: { results: sortedResults } }));
+          })
+          .catch(() => {
+            // leave empty if fetch fails
           });
-
-          return { key, results: sortedResults };
-        })
-        .catch(() => ({ key, results: [] }));
+      }
     });
 
-    Promise.all(fetchPromises).then((results) => {
-      const map: Record<string, PriceReview> = {};
-      results.forEach(({ key, results: priceResults }) => {
-        map[key] = { results: priceResults as PriceReviewResult[] };
-      });
-      setPriceReviewMap(map);
-    });
+    setPriceReviewMap(prev => ({ ...prev, ...map }));
   }, [analysisResult]);
 
   // Enhanced normalization function for better name matching

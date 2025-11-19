@@ -593,13 +593,14 @@ export const getProductPriceReview = async (
  */
 export const submitFeedback = async (
   feedbackType: "positive" | "negative" | null,
-  comment?: string
+  comment?: string,
+  projectId?: string
 ): Promise<string> => {
   try {
-    const response = await axios.post("/api/feedback", {
-      feedbackType,
-      comment: comment || "",
-    });
+    const body: any = { feedbackType, comment: comment || "" };
+    if (projectId) body.projectId = projectId;
+
+    const response = await axios.post("/api/feedback", body);
     // The backend returns a JSON object with a 'response' field.
     return response.data.response;
   } catch (error: any) {

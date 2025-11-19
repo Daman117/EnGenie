@@ -53,6 +53,7 @@ interface AIRecommenderProps {
     advancedParameters: AdvancedParametersResult | null;
     selectedAdvancedParams: { [key: string]: string };
     fieldDescriptions: Record<string, string>;
+    pricingData: Record<string, any>;
   }) => void;
   // Props for restoring saved state
   savedMessages?: ChatMessage[];
@@ -67,6 +68,7 @@ interface AIRecommenderProps {
   savedAdvancedParameters?: AdvancedParametersResult | null;
   savedSelectedAdvancedParams?: { [key: string]: string };
   savedFieldDescriptions?: Record<string, string>;
+  savedPricingData?: Record<string, any>;
 }
 
 const AIRecommender = ({ 
@@ -83,12 +85,22 @@ const AIRecommender = ({
   savedInputValue,
   savedAdvancedParameters,
   savedSelectedAdvancedParams,
-  savedFieldDescriptions
+  savedFieldDescriptions,
+  savedPricingData
 }: AIRecommenderProps) => {
   const { toast } = useToast();
   const { logout } = useAuth();
   const [searchParams] = useSearchParams();
- 
+
+  // State for pricing data from RightPanel
+  const [pricingData, setPricingData] = useState<Record<string, any>>(savedPricingData || {});
+
+  // Handle pricing data updates from RightPanel
+  const handlePricingDataUpdate = (priceReviewMap: Record<string, any>) => {
+    console.log('[PRICING_DATA] Received pricing data update:', Object.keys(priceReviewMap).length, 'products');
+    setPricingData(priceReviewMap);
+  };
+
   // Generate unique search session ID for this component instance
   const [searchSessionId] = useState(() => {
     const id = `search_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -249,6 +261,11 @@ const AIRecommender = ({
         setFieldDescriptions(savedFieldDescriptions);
       }
       
+      if (savedPricingData && Object.keys(savedPricingData).length > 0) {
+        console.log(`[${searchSessionId}] Restoring pricing data:`, Object.keys(savedPricingData).length, 'products');
+        setPricingData(savedPricingData);
+      }
+      
       // After restoration, trigger state notification to parent
       if (onStateChange) {
         console.log(`[${searchSessionId}] Notifying parent of restored state`);
@@ -266,7 +283,8 @@ const AIRecommender = ({
           inputValue: inputValueToNotify,
           advancedParameters: savedAdvancedParameters || null,
           selectedAdvancedParams: savedSelectedAdvancedParams || {},
-          fieldDescriptions: savedFieldDescriptions || {}
+          fieldDescriptions: savedFieldDescriptions || {},
+          pricingData: savedPricingData || {}
         });
       }
     } else {
@@ -276,7 +294,7 @@ const AIRecommender = ({
     // Mark as initialized to prevent re-initialization
     hasInitialized.current = true;
     console.log(`[${searchSessionId}] Initialization complete`);
-  }, [savedMessages, savedCollectedData, savedCurrentStep, savedAnalysisResult, savedRequirementSchema, savedValidationResult, savedCurrentProductType, savedInputValue, savedAdvancedParameters, savedSelectedAdvancedParams, searchSessionId, initialInput]);
+  }, [savedMessages, savedCollectedData, savedCurrentStep, savedAnalysisResult, savedRequirementSchema, savedValidationResult, savedCurrentProductType, savedInputValue, savedAdvancedParameters, savedSelectedAdvancedParams, savedFieldDescriptions, savedPricingData, searchSessionId, initialInput]);
 
   // Notify parent component of state changes for project saving
   useEffect(() => {
@@ -293,10 +311,11 @@ const AIRecommender = ({
         inputValue: state.inputValue,
         advancedParameters,
         selectedAdvancedParams,
-        fieldDescriptions
+        fieldDescriptions,
+        pricingData
       });
     }
-  }, [state.messages, collectedData, currentStep, state.analysisResult, searchSessionId, state.requirementSchema, state.validationResult, state.currentProductType, state.inputValue, advancedParameters, selectedAdvancedParams, fieldDescriptions]);
+  }, [state.messages, collectedData, currentStep, state.analysisResult, searchSessionId, state.requirementSchema, state.validationResult, state.currentProductType, state.inputValue, advancedParameters, selectedAdvancedParams, fieldDescriptions, pricingData]);
  
   // --- Resize functionality ---
   const handleMouseDown = useCallback((e: React.MouseEvent, handle: "left" | "right") => {
@@ -1161,6 +1180,7 @@ const AIRecommender = ({
             requirementSchema={undefined}
             isDocked={isRightDocked}
             setIsDocked={setIsRightDocked}
+            onPricingDataUpdate={handlePricingDataUpdate}
           />
         </div>
       </div>

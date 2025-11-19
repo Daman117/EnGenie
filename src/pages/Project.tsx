@@ -407,6 +407,48 @@ const Project = () => {
         }
       };
 
+      // Include client-side pricing and feedback entries if present in local state
+      // `pricing` may be assembled by the frontend or analysisResult; include if available
+      if ((analysisResults && Object.keys(analysisResults).length > 0) || (tabStates && Object.keys(tabStates).length > 0)) {
+        try {
+          // Try to collect pricing info from tab states (from RightPanel)
+          const pricingDataFromTabs: any = {};
+          Object.entries(tabStates).forEach(([tabId, tabState]: [string, any]) => {
+            if (tabState && tabState.pricingData && Object.keys(tabState.pricingData).length > 0) {
+              console.log(`[SAVE_PROJECT] Collecting pricing data from tab ${tabId}:`, Object.keys(tabState.pricingData).length, 'products');
+              pricingDataFromTabs[tabId] = tabState.pricingData;
+            }
+          });
+          
+          if (Object.keys(pricingDataFromTabs).length > 0) {
+            projectData.pricing = pricingDataFromTabs;
+            console.log(`[SAVE_PROJECT] Included pricing data from`, Object.keys(pricingDataFromTabs).length, 'tabs');
+          }
+          
+          // Also try to collect pricing info embedded in analysisResults for the active tab (fallback)
+          const activeAnalysis = analysisResults[activeTab] || analysisResults['project'] || null;
+          if (activeAnalysis && activeAnalysis.pricing && !projectData.pricing) {
+            projectData.pricing = activeAnalysis.pricing;
+          }
+        } catch (e) {
+          console.error('[SAVE_PROJECT] Error collecting pricing data:', e);
+        }
+      }
+
+      // If UI has any feedback objects (from RightPanel interactions), include them
+      // We expect feedback entries to be stored in `tabStates` under each tab's user interactions
+      try {
+        const feedbackEntries: any[] = [];
+        Object.values(tabStates).forEach((s: any) => {
+          if (s && s.feedbackEntries && Array.isArray(s.feedbackEntries)) {
+            feedbackEntries.push(...s.feedbackEntries);
+          }
+        });
+        if (feedbackEntries.length > 0) projectData.feedback_entries = feedbackEntries;
+      } catch (e) {
+        // ignore
+      }
+
       // If we have a current project ID, include it to update the existing project
       if (currentProjectId) {
         projectData.project_id = currentProjectId;
@@ -656,6 +698,49 @@ const Project = () => {
         });
         
         console.log('Setting restored tab states:', restoredTabStates);
+        // Inject project_id into each tab's analysisResult for downstream components
+        Object.keys(restoredTabStates).forEach((tabId) => {
+          const ar = restoredTabStates[tabId].analysisResult;
+          if (ar && !ar.projectId) {
+            ar.projectId = projectId;
+          }
+          
+          // Embed pricing data into analysisResult for RightPanel to use
+          if (ar && project.pricing) {
+            // Check if we have pricing data for this specific tab
+            const tabPricing = project.pricing[tabId];
+            if (tabPricing) {
+              console.log(`[LOAD_PROJECT] Embedding pricing data for tab ${tabId}:`, Object.keys(tabPricing).length, 'products');
+              
+              // Embed pricing data into the ranked products
+              if (ar.overallRanking && ar.overallRanking.rankedProducts) {
+                ar.overallRanking.rankedProducts.forEach((product: any) => {
+                  const key = `${product.vendor || product.vendorName || product.vendor_name || ''}-${product.productName || product.product_name || product.name || ''}`.trim();
+                  if (tabPricing[key]) {
+                    console.log(`[LOAD_PROJECT] Embedding pricing for product: ${key}`);
+                    product.priceReview = tabPricing[key];
+                    product.pricing = tabPricing[key];
+                  }
+                });
+              }
+            } else {
+              // If no tab-specific pricing, check if we have general pricing data
+              if (typeof project.pricing === 'object' && !Array.isArray(project.pricing)) {
+                console.log(`[LOAD_PROJECT] Checking general pricing data for tab ${tabId}`);
+                if (ar.overallRanking && ar.overallRanking.rankedProducts) {
+                  ar.overallRanking.rankedProducts.forEach((product: any) => {
+                    const key = `${product.vendor || product.vendorName || product.vendor_name || ''}-${product.productName || product.product_name || product.name || ''}`.trim();
+                    if (project.pricing[key]) {
+                      console.log(`[LOAD_PROJECT] Embedding general pricing for product: ${key}`);
+                      product.priceReview = project.pricing[key];
+                      product.pricing = project.pricing[key];
+                    }
+                  });
+                }
+              }
+            }
+          }
+        });
         setTabStates(restoredTabStates);
         
         // Restore the active tab that was saved
@@ -1284,6 +1369,7 @@ const Project = () => {
                   savedAdvancedParameters={savedState?.advancedParameters}
                   savedSelectedAdvancedParams={savedState?.selectedAdvancedParams}
                   savedFieldDescriptions={savedState?.fieldDescriptions}
+                  savedPricingData={savedState?.pricingData}
                 />
               </div>
             );
