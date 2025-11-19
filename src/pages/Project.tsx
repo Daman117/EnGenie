@@ -95,9 +95,17 @@ const Project = () => {
   const computeNextDuplicateName = (base: string, projects: any[]) => {
     if (!base) return `${base} (1)`;
     const baseTrim = base.trim();
-    const regex = new RegExp(`^${escapeRegExp(baseTrim)}(?:\\s*\\((\\d+)\\))?$`, 'i');
+    
+    // Extract the actual base name without any numbering
+    // If base is "Distillation Column (1)", extract "Distillation Column"
+    const baseNameMatch = baseTrim.match(/^(.*?)(?:\s*\(\d+\))?$/);
+    const actualBaseName = baseNameMatch ? baseNameMatch[1].trim() : baseTrim;
+    
+    // Create regex to match all variations of the base name with numbers
+    const regex = new RegExp(`^${escapeRegExp(actualBaseName)}(?:\\s*\\((\\d+)\\))?$`, 'i');
     let maxNum = 0;
     let foundBase = false;
+    
     for (const p of projects) {
       const pName = (p.projectName || p.project_name || '').trim();
       if (!pName) continue;
@@ -113,13 +121,13 @@ const Project = () => {
     }
 
     if (maxNum > 0) {
-      return `${baseTrim} (${maxNum + 1})`;
+      return `${actualBaseName} (${maxNum + 1})`;
     }
 
-    if (foundBase) return `${baseTrim} (1)`;
+    if (foundBase) return `${actualBaseName} (1)`;
 
     // fallback
-    return `${baseTrim} (1)`;
+    return `${actualBaseName} (1)`;
   };
 
   useEffect(() => {
@@ -275,6 +283,11 @@ const Project = () => {
     overrideName?: string,
     options?: { skipDuplicateDialog?: boolean }
   ) => {
+    // Use detected product type if available; do NOT fallback to projectName.
+    // Do not call validation during Save to avoid blocking the save operation.
+    let detectedProductType = tabStates['project']?.currentProductType || '';
+    const effectiveProjectName = ((overrideName ?? projectName) || '').trim() || 'Project';
+
     try {
       // Collect all current project data including chat states
       const conversationHistories: Record<string, any> = {};
@@ -338,8 +351,7 @@ const Project = () => {
 
       // Use detected product type if available; do NOT fallback to projectName.
       // Do not call validation during Save to avoid blocking the save operation.
-      let detectedProductType = tabStates['project']?.currentProductType || '';
-      const effectiveProjectName = ((overrideName ?? projectName) || '').trim() || 'Project';
+      detectedProductType = tabStates['project']?.currentProductType || '';
 
       // Check for duplicate project name on the client by looking at existing projects.
       // This ensures we can prompt even if the backend does not enforce unique names.
@@ -365,7 +377,6 @@ const Project = () => {
             });
 
             if (hasDuplicate) {
-              const data = await listResponse.json();
               const projectsList: any[] = data.projects || [];
               const suggested = computeNextDuplicateName(effectiveProjectName, projectsList);
               setDuplicateProjectName(effectiveProjectName);
@@ -584,11 +595,44 @@ const Project = () => {
       });
 
     } catch (error: any) {
+      // Check if this is a duplicate name error from backend
+      const errorMessage = error.message || "";
+      if (errorMessage.includes("already exists") && errorMessage.includes("Please choose a different name")) {
+        // Extract the project name from the error message
+        const nameMatch = errorMessage.match(/Project name '([^']+)' already exists/);
+        const duplicateName = nameMatch ? nameMatch[1] : effectiveProjectName;
+        
+        // Get current projects to compute suggestion
+        try {
+          const listResp = await fetch(`${BASE_URL}/api/projects`, { credentials: 'include' });
+          if (listResp.ok) {
+            const listData = await listResp.json();
+            const suggested = computeNextDuplicateName(duplicateName, listData.projects || []);
+            setDuplicateProjectName(duplicateName);
+            setAutoRenameSuggestion(suggested);
+            setDuplicateDialogNameInput(duplicateName);
+            setDuplicateDialogError(null);
+            setDuplicateNameDialogOpen(true);
+            return; // Don't show the generic error toast
+          }
+        } catch (e) {
+          // If we can't get projects list, fall back to default behavior
+        }
+      }
+      
       toast({
         title: "Save Failed",
         description: error.message || "Failed to save project",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleProjectDelete = (deletedProjectId: string) => {
+    // Check if the deleted project was the currently active one
+    if (currentProjectId === deletedProjectId) {
+      console.log('Current project was deleted, starting new project...');
+      handleNewProject();
     }
   };
 
@@ -1027,7 +1071,7 @@ const Project = () => {
               <TooltipContent><p>New</p></TooltipContent>
             </Tooltip>
 
-            <ProjectListDialog onProjectSelect={handleOpenProject}>
+            <ProjectListDialog onProjectSelect={handleOpenProject} onProjectDelete={handleProjectDelete}>
               <Button variant="outline" size="sm" className="rounded-lg p-2">
                 <FolderOpen className="h-4 w-4" />
               </Button>
