@@ -5,7 +5,7 @@ import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { Trash2, FileText, Loader2, Download } from 'lucide-react';
 import { BASE_URL } from './AIRecommender/api';
 import { useToast } from '@/hooks/use-toast';
-import { jsPDF } from 'jspdf';
+import jsPDF from "jspdf";
 import {
   AlertDialog,
   AlertDialogAction,
