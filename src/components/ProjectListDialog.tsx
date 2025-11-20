@@ -56,15 +56,22 @@ interface Project {
 }
 
 interface ProjectListDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
   onProjectSelect: (projectId: string) => void;
   onProjectDelete?: (deletedProjectId: string) => void;
 }
 
-const ProjectListDialog: React.FC<ProjectListDialogProps> = ({ children, onProjectSelect, onProjectDelete }) => {
+const ProjectListDialog: React.FC<ProjectListDialogProps> = ({ 
+  open, 
+  onOpenChange, 
+  children, 
+  onProjectSelect, 
+  onProjectDelete 
+}) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
   const fetchProjects = async () => {
@@ -139,15 +146,20 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({ children, onProje
   };
 
   const handleProjectOpen = async (projectId: string) => {
-    setOpen(false);
+    onOpenChange(false);
     onProjectSelect(projectId);
   };
 
-
+  // Fetch projects when dialog opens
+  useEffect(() => {
+    if (open) {
+      fetchProjects();
+    }
+  }, [open]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild onClick={fetchProjects}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild>
         {children}
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
