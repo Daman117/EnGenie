@@ -71,6 +71,7 @@ const Project = () => {
   const [autoRenameSuggestion, setAutoRenameSuggestion] = useState<string | null>(null);
   const [duplicateDialogNameInput, setDuplicateDialogNameInput] = useState<string>('');
   const [duplicateDialogError, setDuplicateDialogError] = useState<string | null>(null);
+  const [isProjectListOpen, setIsProjectListOpen] = useState(false);
   
   // Track conversation states for each search tab
   const [tabStates, setTabStates] = useState<Record<string, any>>({});
@@ -1071,10 +1072,21 @@ const Project = () => {
               <TooltipContent><p>New</p></TooltipContent>
             </Tooltip>
 
-            <ProjectListDialog onProjectSelect={handleOpenProject} onProjectDelete={handleProjectDelete}>
+            <ProjectListDialog 
+              open={isProjectListOpen} 
+              onOpenChange={setIsProjectListOpen}
+              onProjectSelect={handleOpenProject} 
+              onProjectDelete={handleProjectDelete}
+            >
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" className="rounded-lg p-2" title="Open">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="rounded-lg p-2" 
+                    title="Open"
+                    onClick={() => setIsProjectListOpen(true)}
+                  >
                     <FolderOpen className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
