@@ -183,6 +183,7 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({
       if (!project) {
         throw new Error('Project data is empty');
       }
+      const { default: jsPDF } = await import("jspdf");
 
       // 2. Generate PDF
       const doc = new jsPDF();
