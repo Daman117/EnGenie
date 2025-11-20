@@ -72,7 +72,7 @@ const Project = () => {
   const [duplicateDialogNameInput, setDuplicateDialogNameInput] = useState<string>('');
   const [duplicateDialogError, setDuplicateDialogError] = useState<string | null>(null);
   const [isProjectListOpen, setIsProjectListOpen] = useState(false);
-  
+
   // Track conversation states for each search tab
   const [tabStates, setTabStates] = useState<Record<string, any>>({});
   const navigate = useNavigate();
@@ -96,17 +96,17 @@ const Project = () => {
   const computeNextDuplicateName = (base: string, projects: any[]) => {
     if (!base) return `${base} (1)`;
     const baseTrim = base.trim();
-    
+
     // Extract the actual base name without any numbering
     // If base is "Distillation Column (1)", extract "Distillation Column"
     const baseNameMatch = baseTrim.match(/^(.*?)(?:\s*\(\d+\))?$/);
     const actualBaseName = baseNameMatch ? baseNameMatch[1].trim() : baseTrim;
-    
+
     // Create regex to match all variations of the base name with numbers
     const regex = new RegExp(`^${escapeRegExp(actualBaseName)}(?:\\s*\\((\\d+)\\))?$`, 'i');
     let maxNum = 0;
     let foundBase = false;
-    
+
     for (const p of projects) {
       const pName = (p.projectName || p.project_name || '').trim();
       if (!pName) continue;
@@ -156,7 +156,7 @@ const Project = () => {
       setInstruments(response.instruments || []);
       setAccessories(response.accessories || []);
       setShowResults(true);
-      
+
       // Set the project name from the API response, fallback to 'Project' if not provided
       if (response.projectName) {
         setProjectName(response.projectName);
@@ -224,9 +224,9 @@ const Project = () => {
       const targetTab = remaining.find(t => t.id === previousTab)
         ? previousTab
         : remaining.length > 0
-        ? remaining[remaining.length - 1].id
-        : 'project';
-      
+          ? remaining[remaining.length - 1].id
+          : 'project';
+
       // If returning to project tab, restore scroll position
       setPreviousTab(activeTab);
       setActiveTab(targetTab);
@@ -246,7 +246,7 @@ const Project = () => {
   const handleNewProject = () => {
     // Clear current project ID to create a new project instead of updating
     setCurrentProjectId(null);
-    
+
     // Reset all project state
     setShowResults(false);
     setInstruments([]);
@@ -257,9 +257,9 @@ const Project = () => {
     setActiveTab('project');
     setProjectName('Project'); // Reset project name to default
     setTabStates({});
-    
+
     console.log('Started new project - cleared project ID');
-    
+
     toast({
       title: "New Project Started",
       description: "You can now create a fresh project",
@@ -294,7 +294,7 @@ const Project = () => {
       const conversationHistories: Record<string, any> = {};
       const collectedDataAll: Record<string, any> = {};
       const analysisResults: Record<string, any> = {};
-      
+
       // Collect data from each search tab
       const allFieldDescriptions: Record<string, string> = {};
       Object.entries(tabStates).forEach(([tabId, state]) => {
@@ -312,22 +312,22 @@ const Project = () => {
             selectedAdvancedParams: state.selectedAdvancedParams || {},
             fieldDescriptions: state.fieldDescriptions || {}
           };
-          
+
           if (state.collectedData) {
             collectedDataAll[tabId] = state.collectedData;
           }
-          
+
           if (state.analysisResult) {
             analysisResults[tabId] = state.analysisResult;
           }
-          
+
           // Merge field descriptions from all tabs
           if (state.fieldDescriptions) {
             Object.assign(allFieldDescriptions, state.fieldDescriptions);
           }
         }
       });
-      
+
       // Create field descriptions for better data understanding
       const baseFieldDescriptions = {
         project_name: 'Name/title of the project',
@@ -346,7 +346,7 @@ const Project = () => {
         user_interactions: 'Summary of user actions and decisions made during the project',
         project_metadata: 'Additional metadata about project creation, updates, and usage patterns'
       };
-      
+
       // Merge field descriptions from tabs with base descriptions
       const fieldDescriptions = { ...baseFieldDescriptions, ...allFieldDescriptions };
 
@@ -403,7 +403,7 @@ const Project = () => {
         conversation_histories: conversationHistories,
         collected_data: collectedDataAll,
         current_step: activeTab === 'project' ? (showResults ? 'showSummary' : 'initialInput') : 'search',
-        active_tab: activeTab, // Save which tab was currently active
+        active_tab: activeTab === 'project' ? 'Project' : (searchTabs.find(t => t.id === activeTab)?.title || activeTab), // Save tab name instead of ID
         analysis_results: analysisResults,
         field_descriptions: fieldDescriptions,
         workflow_position: {
@@ -433,12 +433,12 @@ const Project = () => {
               pricingDataFromTabs[tabId] = tabState.pricingData;
             }
           });
-          
+
           if (Object.keys(pricingDataFromTabs).length > 0) {
             projectData.pricing = pricingDataFromTabs;
             console.log(`[SAVE_PROJECT] Included pricing data from`, Object.keys(pricingDataFromTabs).length, 'tabs');
           }
-          
+
           // Also try to collect pricing info embedded in analysisResults for the active tab (fallback)
           const activeAnalysis = analysisResults[activeTab] || analysisResults['project'] || null;
           if (activeAnalysis && activeAnalysis.pricing && !projectData.pricing) {
@@ -543,7 +543,7 @@ const Project = () => {
         const errorMessage = errorData?.error || 'Failed to save project';
         const errorCode = errorData?.code || errorData?.errorCode;
 
-          const looksLikeDuplicateNameError =
+        const looksLikeDuplicateNameError =
           response.status === 409 ||
           errorCode === 'DUPLICATE_PROJECT_NAME' ||
           /already exists|already present|duplicate project name/i.test(errorMessage);
@@ -577,12 +577,12 @@ const Project = () => {
       }
 
       const result = await response.json();
-      
+
       // If we didn't have a project ID before, set it now for future updates
       if (!currentProjectId && result.project_id) {
         setCurrentProjectId(result.project_id);
       }
-      
+
       // Ensure local state reflects the name we actually saved
       if (overrideName && overrideName.trim()) {
         setProjectName(overrideName.trim());
@@ -590,7 +590,7 @@ const Project = () => {
 
       toast({
         title: currentProjectId ? "Project Updated" : "Project Saved",
-        description: currentProjectId 
+        description: currentProjectId
           ? `"${effectiveProjectName}" has been updated successfully`
           : `"${effectiveProjectName}" has been saved successfully`,
       });
@@ -602,7 +602,7 @@ const Project = () => {
         // Extract the project name from the error message
         const nameMatch = errorMessage.match(/Project name '([^']+)' already exists/);
         const duplicateName = nameMatch ? nameMatch[1] : effectiveProjectName;
-        
+
         // Get current projects to compute suggestion
         try {
           const listResp = await fetch(`${BASE_URL}/api/projects`, { credentials: 'include' });
@@ -620,7 +620,7 @@ const Project = () => {
           // If we can't get projects list, fall back to default behavior
         }
       }
-      
+
       toast({
         title: "Save Failed",
         description: error.message || "Failed to save project",
@@ -651,9 +651,9 @@ const Project = () => {
       const data = await response.json();
       const project = data.project;
       console.log('Loading project data:', project);
-      
+
       // Do not clear existing session state before loading project
-      
+
       // Restore project state with debugging
       // Restore product type from loaded project
       const restoredProductType = project.productType || project.product_type || projectName;
@@ -671,16 +671,16 @@ const Project = () => {
       }));
       console.log('Restoring project name:', project.projectName || project.project_name);
       setProjectName(project.projectName || project.project_name || 'Project');
-      
+
       console.log('Restoring requirements:', (project.initialRequirements || project.initial_requirements || '').substring(0, 100));
       setRequirements(project.initialRequirements || project.initial_requirements || '');
-      
+
       console.log('Restoring instruments count:', (project.identifiedInstruments || project.identified_instruments || []).length);
       setInstruments(project.identifiedInstruments || project.identified_instruments || []);
-      
+
       console.log('Restoring accessories count:', (project.identifiedAccessories || project.identified_accessories || []).length);
       setAccessories(project.identifiedAccessories || project.identified_accessories || []);
-      
+
       // Show results if we have instruments/accessories
       const instruments = project.identifiedInstruments || project.identified_instruments || [];
       const accessories = project.identifiedAccessories || project.identified_accessories || [];
@@ -692,28 +692,28 @@ const Project = () => {
       } else {
         console.log('No results to show, keeping showResults false');
       }
-      
+
       // Restore search tabs and conversation states
       const savedSearchTabs = project.searchTabs || project.search_tabs || [];
       console.log('Saved search tabs:', savedSearchTabs);
-      
+
       if (savedSearchTabs.length > 0) {
         console.log('Restoring search tabs...');
         setSearchTabs(savedSearchTabs);
-        
+
         // Restore conversation histories for each tab
         const conversationHistories = project.conversationHistories || project.conversation_histories || project.conversationHistory || project.conversation_history || {};
         const restoredTabStates: Record<string, any> = {};
-        
+
         console.log('Conversation histories:', conversationHistories);
-        
+
         savedSearchTabs.forEach((tab: any) => {
           console.log(`Processing tab ${tab.id}:`, tab);
-          
+
           if (conversationHistories[tab.id]) {
             const tabHistory = conversationHistories[tab.id];
             console.log(`Restoring conversation for tab ${tab.id}:`, tabHistory);
-            
+
             restoredTabStates[tab.id] = {
               messages: tabHistory.messages || [],
               currentStep: tabHistory.currentStep || 'greeting',
@@ -729,7 +729,7 @@ const Project = () => {
               selectedAdvancedParams: tabHistory.selectedAdvancedParams || {},
               fieldDescriptions: tabHistory.fieldDescriptions || (project.fieldDescriptions || project.field_descriptions) || {}
             };
-            
+
             console.log(`Restored state for tab ${tab.id}:`, restoredTabStates[tab.id]);
           } else {
             // Create default state for tabs without conversation history
@@ -743,7 +743,7 @@ const Project = () => {
             };
           }
         });
-        
+
         console.log('Setting restored tab states:', restoredTabStates);
         // Inject project_id into each tab's analysisResult for downstream components
         Object.keys(restoredTabStates).forEach((tabId) => {
@@ -751,14 +751,14 @@ const Project = () => {
           if (ar && !ar.projectId) {
             ar.projectId = projectId;
           }
-          
+
           // Embed pricing data into analysisResult for RightPanel to use
           if (ar && project.pricing) {
             // Check if we have pricing data for this specific tab
             const tabPricing = project.pricing[tabId];
             if (tabPricing) {
               console.log(`[LOAD_PROJECT] Embedding pricing data for tab ${tabId}:`, Object.keys(tabPricing).length, 'products');
-              
+
               // Embed pricing data into the ranked products
               if (ar.overallRanking && ar.overallRanking.rankedProducts) {
                 ar.overallRanking.rankedProducts.forEach((product: any) => {
@@ -789,13 +789,39 @@ const Project = () => {
           }
         });
         setTabStates(restoredTabStates);
-        
+
         // Restore the active tab that was saved
         const savedActiveTab = project.activeTab || project.active_tab;
         if (savedActiveTab) {
           console.log('Restoring saved active tab:', savedActiveTab);
-          setActiveTab(savedActiveTab);
-          setPreviousTab('project');
+
+          if (savedActiveTab === 'Project' || savedActiveTab === 'project') {
+            setActiveTab('project');
+            setPreviousTab('project');
+          } else {
+            // Try to find tab by title first (new behavior)
+            const tabByTitle = savedSearchTabs.find((t: any) => t.title === savedActiveTab);
+            if (tabByTitle) {
+              setActiveTab(tabByTitle.id);
+              setPreviousTab('project');
+            } else {
+              // Fallback: try to find by ID (legacy behavior)
+              const tabById = savedSearchTabs.find((t: any) => t.id === savedActiveTab);
+              if (tabById) {
+                setActiveTab(tabById.id);
+                setPreviousTab('project');
+              } else {
+                // Default if not found
+                if (savedSearchTabs.length > 0) {
+                  setActiveTab(savedSearchTabs[0].id);
+                  setPreviousTab('project');
+                } else {
+                  setActiveTab('project');
+                  setPreviousTab('project');
+                }
+              }
+            }
+          }
         } else if (savedSearchTabs.length > 0) {
           console.log('No saved active tab, setting to first search tab:', savedSearchTabs[0].id);
           setActiveTab(savedSearchTabs[0].id);
@@ -806,7 +832,7 @@ const Project = () => {
         // Clear tab states if no search tabs
         setTabStates({});
       }
-      
+
       // Only reset to project tab if no search tabs were restored and no active tab was saved
       const savedActiveTab = project.activeTab || project.active_tab;
       if (savedSearchTabs.length === 0 && !savedActiveTab) {
@@ -816,44 +842,45 @@ const Project = () => {
       } else {
         console.log('Search tabs or saved active tab found, active tab should be restored above');
       }
-      
-        console.log('Project loading completed successfully');
-        
-        // Log field descriptions and metadata if available
-        const fieldDescriptions = project.fieldDescriptions || project.field_descriptions;
-        if (fieldDescriptions) {
-          console.log('Project field descriptions loaded:', Object.keys(fieldDescriptions).length, 'fields documented');
-        }
-        
-        const workflowPosition = project.workflowPosition || project.workflow_position;
-        if (workflowPosition) {
-          console.log('Project workflow position:', workflowPosition);
-        }
-        
-        const userInteractions = project.userInteractions || project.user_interactions;
-        if (userInteractions) {
-          console.log('Project user interactions summary:', userInteractions);
-        }
-        
-        const projectMetadata = project.projectMetadata || project.project_metadata;
-        if (projectMetadata) {
-          console.log('Project metadata loaded:', projectMetadata);
-        }
-        
-        // Set the current project ID for future saves (so it updates instead of creating new)
-        console.log('Setting current project ID for updates:', projectId);
-        setCurrentProjectId(projectId);
-        
-        // Also restore the project's current step if available
-        const projectCurrentStep = project.currentStep || project.current_step;
-        if (projectCurrentStep) {
-          console.log('Project was at step:', projectCurrentStep);
-        }
-        
-        toast({
-          title: "Project Loaded",
-          description: `"${project.projectName || project.project_name}" has been loaded successfully. ${savedSearchTabs.length} search tabs restored.`,
-        });    } catch (error: any) {
+
+      console.log('Project loading completed successfully');
+
+      // Log field descriptions and metadata if available
+      const fieldDescriptions = project.fieldDescriptions || project.field_descriptions;
+      if (fieldDescriptions) {
+        console.log('Project field descriptions loaded:', Object.keys(fieldDescriptions).length, 'fields documented');
+      }
+
+      const workflowPosition = project.workflowPosition || project.workflow_position;
+      if (workflowPosition) {
+        console.log('Project workflow position:', workflowPosition);
+      }
+
+      const userInteractions = project.userInteractions || project.user_interactions;
+      if (userInteractions) {
+        console.log('Project user interactions summary:', userInteractions);
+      }
+
+      const projectMetadata = project.projectMetadata || project.project_metadata;
+      if (projectMetadata) {
+        console.log('Project metadata loaded:', projectMetadata);
+      }
+
+      // Set the current project ID for future saves (so it updates instead of creating new)
+      console.log('Setting current project ID for updates:', projectId);
+      setCurrentProjectId(projectId);
+
+      // Also restore the project's current step if available
+      const projectCurrentStep = project.currentStep || project.current_step;
+      if (projectCurrentStep) {
+        console.log('Project was at step:', projectCurrentStep);
+      }
+
+      toast({
+        title: "Project Loaded",
+        description: `"${project.projectName || project.project_name}" has been loaded successfully. ${savedSearchTabs.length} search tabs restored.`,
+      });
+    } catch (error: any) {
       toast({
         title: "Load Failed",
         description: error.message || "Failed to load project",
@@ -1072,18 +1099,18 @@ const Project = () => {
               <TooltipContent><p>New</p></TooltipContent>
             </Tooltip>
 
-            <ProjectListDialog 
-              open={isProjectListOpen} 
+            <ProjectListDialog
+              open={isProjectListOpen}
               onOpenChange={setIsProjectListOpen}
-              onProjectSelect={handleOpenProject} 
+              onProjectSelect={handleOpenProject}
               onProjectDelete={handleProjectDelete}
             >
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="rounded-lg p-2" 
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-lg p-2"
                     title="Open"
                     onClick={() => setIsProjectListOpen(true)}
                   >
@@ -1102,7 +1129,7 @@ const Project = () => {
                     <Button
                       variant="outline"
                       className="text-sm font-semibold text-muted-foreground hover:bg-secondary/50 p-2"
-                      // title={profileButtonLabel}
+                    // title={profileButtonLabel}
                     >
                       <div className="w-7 h-7 rounded-full bg-ai-primary flex items-center justify-center text-white font-bold">
                         {profileButtonLabel.charAt(0)}
@@ -1110,7 +1137,7 @@ const Project = () => {
                     </Button>
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
-                  <TooltipContent><p>Profile</p></TooltipContent>    
+                <TooltipContent><p>Profile</p></TooltipContent>
               </Tooltip>
               <DropdownMenuContent
                 className="w-56 bg-popover rounded-xl shadow-xl border border-border mt-1"
@@ -1217,198 +1244,198 @@ const Project = () => {
             >
               <div className="mx-auto max-w-[800px] px-6 min-h-full flex items-center justify-center">
                 <div className="w-full py-6">
-          {/* Header */}
-          <div className="text-center mb-6">
-            <div className="flex items-center justify-center gap-4 mb-4">
-              <div className="w-16 h-16 rounded-full overflow-hidden shadow">
-                <video
-                  src="/animation.mp4"
-                  autoPlay
-                  muted
-                  playsInline
-                  disablePictureInPicture
-                  controls={false}
-                  onContextMenu={(e) => e.preventDefault()}
-                  className="w-full h-full object-cover pointer-events-none"
-                />
-              </div>
-              <h1 className="text-4xl font-bold text-foreground">
-                EnGenie
-              </h1>
-            </div>
-          </div>
+                  {/* Header */}
+                  <div className="text-center mb-6">
+                    <div className="flex items-center justify-center gap-4 mb-4">
+                      <div className="w-16 h-16 rounded-full overflow-hidden shadow">
+                        <video
+                          src="/animation.mp4"
+                          autoPlay
+                          muted
+                          playsInline
+                          disablePictureInPicture
+                          controls={false}
+                          onContextMenu={(e) => e.preventDefault()}
+                          className="w-full h-full object-cover pointer-events-none"
+                        />
+                      </div>
+                      <h1 className="text-4xl font-bold text-foreground">
+                        EnGenie
+                      </h1>
+                    </div>
+                  </div>
 
-          {!showResults && (
-            <div className="text-center space-y-4 mb-8">
-              <h2 className="text-3xl font-bold">
-                What are your requirements?
-              </h2>
-              {/* <p className="text-muted-foreground text-lg">
+                  {!showResults && (
+                    <div className="text-center space-y-4 mb-8">
+                      <h2 className="text-3xl font-bold">
+                        What are your requirements?
+                      </h2>
+                      {/* <p className="text-muted-foreground text-lg">
                 Describe your Industrial Process Control System needs
               </p> */}
-           
-            </div>
-          )}
 
-          {/* Input Form (always visible) */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-4">
-              <Textarea
-                placeholder="Example: I need a pressure transmitter for measuring 0-100 bar with 4-20mA output and a temperature sensor for 0-200°C..."
-                value={requirements}
-                onChange={(e) => setRequirements(e.target.value)}
-                onKeyDown={handleKeyPress}
-                className={`text-base resize-none rounded-xl bg-white border-2 border-gray-600 focus:border-gray-600 focus:ring-0 focus:ring-offset-0 focus:outline-none focus:shadow-none hover:border-gray-600 active:border-gray-600 [&:focus]:!border-gray-600 [&:focus]:!ring-0 [&:focus]:!ring-offset-0 [&:focus]:!shadow-none [&:focus]:!outline-none ${showResults ? 'min-h-[160px]' : 'min-h-[400px]'}`}
-                disabled={isLoading}
-                style={{ boxShadow: 'none' }}
-              />
-
-              <div className="flex justify-end">
-                <Button
-                  type="submit"
-                  disabled={isLoading || !requirements.trim()}
-                  className="btn-primary px-8 py-6 text-lg rounded-xl"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="mr-2 h-5 w-5" />
-                      {showResults ? 'Re-run' : 'Submit'}
-                    </>
+                    </div>
                   )}
-                </Button>
-              </div>
-            </div>
-          </form>
 
-          {/* Results Display (shown below input when available) */}
-          {showResults && (
-            <div className="space-y-6 mt-6">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold">
-                   Instruments ({instruments.length})
-                </h2>
-              </div>
+                  {/* Input Form (always visible) */}
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="space-y-4">
+                      <Textarea
+                        placeholder="Example: I need a pressure transmitter for measuring 0-100 bar with 4-20mA output and a temperature sensor for 0-200°C..."
+                        value={requirements}
+                        onChange={(e) => setRequirements(e.target.value)}
+                        onKeyDown={handleKeyPress}
+                        className={`text-base resize-none rounded-xl bg-white border-2 border-gray-600 focus:border-gray-600 focus:ring-0 focus:ring-offset-0 focus:outline-none focus:shadow-none hover:border-gray-600 active:border-gray-600 [&:focus]:!border-gray-600 [&:focus]:!ring-0 [&:focus]:!ring-offset-0 [&:focus]:!shadow-none [&:focus]:!outline-none ${showResults ? 'min-h-[160px]' : 'min-h-[400px]'}`}
+                        disabled={isLoading}
+                        style={{ boxShadow: 'none' }}
+                      />
 
-              {/* Instruments Section */}
-              {instruments.length > 0 && (
-                <div className="space-y-4">
-                  {instruments.map((instrument, index) => (
-                    <div
-                      key={index}
-                      className="border rounded-xl p-6 space-y-4 hover:shadow-lg transition-shadow"
-                    >
-                      {/* Category and Product Name */}
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <h3 className="text-xl font-semibold">
-                            {index + 1}. {instrument.category}{instrument.quantity ? ` (${instrument.quantity})` : ''}
-                          </h3>
-                          <p className="text-muted-foreground">
-                            {instrument.productName}
-                          </p>
-                        </div>
+                      <div className="flex justify-end">
                         <Button
-                          onClick={() => handleRun(instrument, index)}
-                          className="btn-primary rounded-xl px-6"
+                          type="submit"
+                          disabled={isLoading || !requirements.trim()}
+                          className="btn-primary px-8 py-6 text-lg rounded-xl"
                         >
-                          <Play className="mr-2 h-4 w-4" />
-                          Search
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                              Analyzing...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="mr-2 h-5 w-5" />
+                              {showResults ? 'Re-run' : 'Submit'}
+                            </>
+                          )}
                         </Button>
                       </div>
+                    </div>
+                  </form>
 
-                      {/* Specifications */}
-                      {Object.keys(instrument.specifications).length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="font-medium text-sm text-muted-foreground">
-                            Specifications:
-                          </h4>
-                          <div className="grid grid-cols-2 gap-3">
-                            {Object.entries(instrument.specifications).map(([key, value]) => (
-                              <div key={key} className="text-sm">
-                                <span className="font-medium">{key}:</span>{' '}
-                                <span className="text-muted-foreground">{value}</span>
+                  {/* Results Display (shown below input when available) */}
+                  {showResults && (
+                    <div className="space-y-6 mt-6">
+                      <div className="mb-6">
+                        <h2 className="text-2xl font-bold">
+                          Instruments ({instruments.length})
+                        </h2>
+                      </div>
+
+                      {/* Instruments Section */}
+                      {instruments.length > 0 && (
+                        <div className="space-y-4">
+                          {instruments.map((instrument, index) => (
+                            <div
+                              key={index}
+                              className="border rounded-xl p-6 space-y-4 hover:shadow-lg transition-shadow"
+                            >
+                              {/* Category and Product Name */}
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-1">
+                                  <h3 className="text-xl font-semibold">
+                                    {index + 1}. {instrument.category}{instrument.quantity ? ` (${instrument.quantity})` : ''}
+                                  </h3>
+                                  <p className="text-muted-foreground">
+                                    {instrument.productName}
+                                  </p>
+                                </div>
+                                <Button
+                                  onClick={() => handleRun(instrument, index)}
+                                  className="btn-primary rounded-xl px-6"
+                                >
+                                  <Play className="mr-2 h-4 w-4" />
+                                  Search
+                                </Button>
                               </div>
-                            ))}
-                          </div>
+
+                              {/* Specifications */}
+                              {Object.keys(instrument.specifications).length > 0 && (
+                                <div className="space-y-2">
+                                  <h4 className="font-medium text-sm text-muted-foreground">
+                                    Specifications:
+                                  </h4>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    {Object.entries(instrument.specifications).map(([key, value]) => (
+                                      <div key={key} className="text-sm">
+                                        <span className="font-medium">{key}:</span>{' '}
+                                        <span className="text-muted-foreground">{value}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Sample Input Preview */}
+                              <div className="pt-3 border-t">
+                                <p className="text-xs text-muted-foreground mb-2">Sample Input:</p>
+                                <p className="text-sm bg-muted p-3 rounded-lg font-mono">
+                                  {instrument.sampleInput}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
-
-                      {/* Sample Input Preview */}
-                      <div className="pt-3 border-t">
-                        <p className="text-xs text-muted-foreground mb-2">Sample Input:</p>
-                        <p className="text-sm bg-muted p-3 rounded-lg font-mono">
-                          {instrument.sampleInput}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <h2 className="text-2xl font-bold">
-                   Accessories ({accessories.length})
-                </h2>
-              {/* Accessories Section */}
-              {accessories.length > 0 && (
-                <div className="space-y-4 mt-8">
-                  {accessories.map((accessory, index) => (
-                    <div
-                      key={index}
-                      className="border border-dashed rounded-xl p-6 space-y-4 hover:shadow-lg transition-shadow bg-muted/30"
-                    >
-                      {/* Category and Accessory Name */}
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <h3 className="text-xl font-semibold">
-                            {index + 1}. {accessory.category}{accessory.quantity ? ` (${accessory.quantity})` : ''}
-                          </h3>
-                          <p className="text-muted-foreground">
-                            {accessory.accessoryName}
-                          </p>
-                        </div>
-                        <Button
-                          onClick={() => handleRunAccessory(accessory, index)}
-                          className="btn-primary rounded-xl px-6"
-                        >
-                          <Play className="mr-2 h-4 w-4" />
-                          Search
-                        </Button>
-                      </div>
-
-                      {/* Specifications */}
-                      {Object.keys(accessory.specifications).length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="font-medium text-sm text-muted-foreground">
-                            Specifications:
-                          </h4>
-                          <div className="grid grid-cols-2 gap-3">
-                            {Object.entries(accessory.specifications).map(([key, value]) => (
-                              <div key={key} className="text-sm">
-                                <span className="font-medium">{key}:</span>{' '}
-                                <span className="text-muted-foreground">{value}</span>
+                      <h2 className="text-2xl font-bold">
+                        Accessories ({accessories.length})
+                      </h2>
+                      {/* Accessories Section */}
+                      {accessories.length > 0 && (
+                        <div className="space-y-4 mt-8">
+                          {accessories.map((accessory, index) => (
+                            <div
+                              key={index}
+                              className="border border-dashed rounded-xl p-6 space-y-4 hover:shadow-lg transition-shadow bg-muted/30"
+                            >
+                              {/* Category and Accessory Name */}
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-1">
+                                  <h3 className="text-xl font-semibold">
+                                    {index + 1}. {accessory.category}{accessory.quantity ? ` (${accessory.quantity})` : ''}
+                                  </h3>
+                                  <p className="text-muted-foreground">
+                                    {accessory.accessoryName}
+                                  </p>
+                                </div>
+                                <Button
+                                  onClick={() => handleRunAccessory(accessory, index)}
+                                  className="btn-primary rounded-xl px-6"
+                                >
+                                  <Play className="mr-2 h-4 w-4" />
+                                  Search
+                                </Button>
                               </div>
-                            ))}
-                          </div>
+
+                              {/* Specifications */}
+                              {Object.keys(accessory.specifications).length > 0 && (
+                                <div className="space-y-2">
+                                  <h4 className="font-medium text-sm text-muted-foreground">
+                                    Specifications:
+                                  </h4>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    {Object.entries(accessory.specifications).map(([key, value]) => (
+                                      <div key={key} className="text-sm">
+                                        <span className="font-medium">{key}:</span>{' '}
+                                        <span className="text-muted-foreground">{value}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Sample Input Preview */}
+                              <div className="pt-3 border-t">
+                                <p className="text-xs text-muted-foreground mb-2">Sample Input:</p>
+                                <p className="text-sm bg-muted p-3 rounded-lg font-mono">
+                                  {accessory.sampleInput}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
-
-                      {/* Sample Input Preview */}
-                      <div className="pt-3 border-t">
-                        <p className="text-xs text-muted-foreground mb-2">Sample Input:</p>
-                        <p className="text-sm bg-muted p-3 rounded-lg font-mono">
-                          {accessory.sampleInput}
-                        </p>
-                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                  )}
                 </div>
               </div>
             </div>
@@ -1422,10 +1449,10 @@ const Project = () => {
                 key={tab.id}
                 className={`h-[calc(100vh-120px)] ${activeTab === tab.id ? 'block' : 'hidden'}`}
               >
-                <AIRecommender 
-                  key={tab.id} 
-                  initialInput={tab.input} 
-                  fillParent 
+                <AIRecommender
+                  key={tab.id}
+                  initialInput={tab.input}
+                  fillParent
                   onStateChange={(state) => handleTabStateChange(tab.id, state)}
                   savedMessages={savedState?.messages}
                   savedCollectedData={savedState?.collectedData}
