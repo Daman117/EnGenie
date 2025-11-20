@@ -193,12 +193,24 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({
 
       // Helper to add text and advance yPos
       const addText = (text: string, fontSize: number = 12, isBold: boolean = false, indent: number = 0, color: string = '#000000') => {
+        // sanitize basic markdown and HTML tokens so clear text doesn't include markers like **
+        let s = (text === null || text === undefined) ? '' : String(text);
+        s = s.replace(/<[^>]*>/g, '');
+        s = s.replace(/\*\*/g, '');
+        s = s.replace(/\*/g, '');
+        s = s.replace(/\*/g, '');
+        s = s.replace(/_/g, '');
+        s = s.replace(/`/g, '');
+        s = s.replace(/#/g, '');
+        s = s.replace(/~~/g, '');
+        s = s.replace(/\r/g, '');
+
         doc.setFontSize(fontSize);
         doc.setFont("helvetica", isBold ? "bold" : "normal");
         doc.setTextColor(color);
 
         const maxWidth = pageWidth - (margin * 2) - indent;
-        const splitText = doc.splitTextToSize(text, maxWidth);
+        const splitText = doc.splitTextToSize(s, maxWidth);
 
         // Check for page break
         if (yPos + (splitText.length * fontSize * 0.5) > pageHeight - margin) {
@@ -246,6 +258,48 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({
         addText(`  • ${label}: ${String(value)}`, valFontSize, false, indent);
       };
 
+      // Clean text helper: remove markdown formatting characters and clean up text
+      const cleanText = (input: string | null | undefined) => {
+        if (input === null || input === undefined) return '';
+        let s = String(input);
+        
+        // Remove HTML tags
+        s = s.replace(/<[^>]*>/g, '');
+        
+        // Remove markdown formatting characters
+        s = s.replace(/\*\*/g, '');  // Remove **
+        s = s.replace(/_/g, '');     // Remove _
+        s = s.replace(/`/g, '');     // Remove `
+        s = s.replace(/#/g, '');     // Remove #
+        s = s.replace(/~~/g, '');
+        s = s.replace(/\/\*\*/g, '');    // Remove ~~
+        
+        // Clean up whitespace and newlines
+        s = s.replace(/[\t\r]+/g, ' ')  // Tabs and carriage returns to space
+             .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
+             .replace(/ {2,}/g, ' ')      // Multiple spaces to single
+             .trim();
+        
+        return s;
+      };
+
+      // Strip leading bullet/numbering characters from a line (to avoid double-bullets)
+      const stripLeadingBullets = (input: string | null | undefined) => {
+        if (input === null || input === undefined) return '';
+        let s = String(input).trim();
+        // Remove common bullet characters, asterisk, hyphen, middle dot, numbering like '1.' or '1)'
+        s = s.replace(/^[\s]*(?:[\u2022\u00B7\u25E6\-*•·◦oO]+|\d+[\.)]|\(|\)|>)+[\s]*/g, '');
+        // Also remove any leading dash or asterisk sequences
+        s = s.replace(/^[\s]*[-*]+[\s]*/g, '');
+        return s.trim();
+      };
+
+      // Normalize keys for fuzzy matching pricing keys
+      const normalizeKey = (k: string) => {
+        if (!k) return '';
+        return String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
+      };
+
       const addSectionHeader = (title: string) => {
         yPos += 5;
         if (yPos > pageHeight - margin) {
@@ -254,6 +308,123 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({
         }
         addText(title, 14, true);
         yPos += 2;
+      };
+
+      // Helper to add a bold label and an inline clickable link on the same line
+      const addInlineLink = (label: string, link: string, fontSize: number = 10, indent: number = 20) => {
+        const cleanUrl = cleanText(link);
+
+        // Ensure there's room on the page
+        if (yPos > pageHeight - margin) {
+          doc.addPage();
+          yPos = margin;
+        }
+
+        // Draw label on its own line in bold (matching other section headings)
+        addText(label, fontSize, true, indent - 2);
+
+        // Draw the clickable url on next line, indented further
+        doc.setFontSize(fontSize);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 255);
+
+        const startX = margin + indent + 4;
+        // Use textWithLink to embed link
+        doc.textWithLink(cleanUrl, startX, yPos, { url: cleanUrl });
+
+        // Underline link
+        const textWidth = doc.getTextWidth(cleanUrl);
+        doc.setDrawColor(0, 0, 255);
+        doc.setLineWidth(0.2);
+        doc.line(startX, yPos + 0.5, startX + textWidth, yPos + 0.5);
+
+        // Reset colors
+        doc.setDrawColor(0, 0, 0);
+        doc.setTextColor('#000000');
+
+        // Advance yPos
+        yPos += (fontSize * 0.5) + 4;
+      };
+
+      // Helper to draw inline bold label followed by normal text on same line
+      const drawInlineBoldThenText = (boldText: string, normalText: string, indent: number = 25, fontSize: number = 10) => {
+        if (yPos > pageHeight - margin) {
+          doc.addPage();
+          yPos = margin;
+        }
+
+        doc.setFontSize(fontSize);
+
+        // sanitize inputs (remove markdown tokens including single asterisks)
+        const b = (boldText === null || boldText === undefined) ? '' : String(boldText).replace(/<[^>]*>/g, '').replace(/\*\*/g, '').replace(/\*/g, '').replace(/_/g, '').replace(/`/g, '').replace(/#/g, '').replace(/~~/g, '');
+        const n = (normalText === null || normalText === undefined) ? '' : String(normalText).replace(/<[^>]*>/g, '').replace(/\*\*/g, '').replace(/\*/g, '').replace(/_/g, '').replace(/`/g, '').replace(/#/g, '').replace(/~~/g, '');
+
+        // Bold part
+        doc.setFont('helvetica', 'bold');
+        const startX = margin + indent;
+        doc.text(b, startX, yPos);
+        const labelWidth = doc.getTextWidth(b + ' ');
+
+        // Normal part
+        doc.setFont('helvetica', 'normal');
+        doc.text(n, startX + labelWidth, yPos);
+
+        yPos += (fontSize * 0.5) + 2;
+      };
+
+      // Simple markdown-like renderer for AI messages (headings, bold labels, lists)
+      const renderRichText = (input: string | null | undefined, indent: number = 15, fontSize: number = 10) => {
+        if (!input) return;
+        const lines = String(input).split('\n');
+        lines.forEach((raw) => {
+          const line = raw.replace(/\r/g, '').trim();
+          if (!line) {
+            yPos += (fontSize * 0.5) + 2;
+            return;
+          }
+
+          // ATX-style heading (#) -> bold header
+          if (/^#{1,6}\s+/.test(line)) {
+            addText(line.replace(/^#{1,6}\s+/, ''), fontSize + 1, true, indent - 2);
+            return;
+          }
+
+          // Bold-wrapped heading or section like **Title:**
+          const boldHeadingMatch = line.match(/^\*\*(.+?)\*\*:?\s*(.*)$/);
+          if (boldHeadingMatch && boldHeadingMatch[2] === '') {
+            addText(boldHeadingMatch[1], fontSize + 0, true, indent - 2);
+            return;
+          }
+
+          // List item (numbered or star) e.g. '* **Pressure Range:** 0-75 psi' or '1. Text'
+          const listMatch = line.match(/^([*\-]|\d+\.)\s+(.*)$/);
+          if (listMatch) {
+            const content = listMatch[2];
+
+            // If content contains bold label like **Label:** rest
+            const labelMatch = content.match(/^\*\*(.+?)\*\*[:\-]?\s*(.*)$/);
+            if (labelMatch) {
+              const lbl = labelMatch[1];
+              const rest = labelMatch[2] || '';
+              drawInlineBoldThenText(`• ${lbl}:`, rest, indent, fontSize);
+            } else {
+              addText(`• ${content}`, fontSize, false, indent);
+            }
+            return;
+          }
+
+          // Fallback: treat as normal paragraph, but if it starts with bold label, split
+          const inlineLabel = line.match(/^\*\*(.+?)\*\*[:\-]?\s*(.*)$/);
+          if (inlineLabel) {
+            const lbl = inlineLabel[1];
+            const rest = inlineLabel[2] || '';
+            drawInlineBoldThenText(`${lbl}:`, rest, indent, fontSize);
+            return;
+          }
+
+          // Default plain text
+          addText(line, fontSize, false, indent);
+        });
       };
 
       // --- Title ---
@@ -383,19 +554,19 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({
 
                     fieldKeys.forEach(key => {
                       const value = data[key];
-                        // Skip empty optional fields entirely
-                        if (groupName !== 'Mandatory' && (value === undefined || value === null || value === "")) {
-                          return;
-                        }
+                      // Skip empty optional fields entirely
+                      if (groupName !== 'Mandatory' && (value === undefined || value === null || value === "")) {
+                        return;
+                      }
 
-                        // Format label: convert camelCase to Title Case with proper spacing
-                        const label = key
-                          .replace(/([A-Z])/g, ' $1')
-                          .replace(/^./, str => str.toUpperCase())
-                          .trim();
+                      // Format label: convert camelCase to Title Case with proper spacing
+                      const label = key
+                        .replace(/([A-Z])/g, ' $1')
+                        .replace(/^./, str => str.toUpperCase())
+                        .trim();
 
-                        // Use helper to print value (handles nested objects/arrays and missing values)
-                        printFieldValue(label, value, 10);
+                      // Use helper to print value (handles nested objects/arrays and missing values)
+                      printFieldValue(label, value, 10);
                     });
 
                     yPos += 2;
@@ -479,38 +650,284 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({
                 yPos += 2;
                 addText(`${idx + 1}. ${pName} (${vendor})`, 11, true, 15);
 
+                // Description
                 if (product.description) {
                   addText(`Description: ${product.description}`, 10, false, 20);
                 }
 
-                // Price
-                const price = product.price || product.pricing;
+                // Key Strengths / Pros (check many possible keys)
+                const strengthKeys = ['keyStrengths', 'key_strengths', 'strengths', 'pros', 'pros_list', 'prosList', 'advantages', 'benefits', 'benefits_list', 'key_benefits', 'keyBenefits', 'positives', 'key_points', 'keyPoints', 'highlights'];
+                let keyStrengths = null;
+                for (const k of strengthKeys) {
+                  if (product[k]) { keyStrengths = product[k]; break; }
+                }
+                if (keyStrengths) {
+                  addText('Key Strengths:', 10, true, 20);
+                  yPos += 2; // Add some spacing
+
+                  const addBulletPoints = (content: any, indent: number = 25) => {
+                    if (Array.isArray(content)) {
+                      content.forEach((item: any) => {
+                        if (item && typeof item === 'object') {
+                          Object.entries(item).forEach(([k, v]) => {
+                            const key = stripLeadingBullets(cleanText(k));
+                            const val = stripLeadingBullets(cleanText(String(v)));
+                            addText(`• ${key}: ${val}`, 10, false, indent);
+                          });
+                        } else if (item) {
+                          const line = stripLeadingBullets(cleanText(String(item)));
+                          addText(`• ${line}`, 10, false, indent);
+                        }
+                      });
+                    } else if (content && typeof content === 'object') {
+                      Object.entries(content).forEach(([k, v]) => {
+                        const key = stripLeadingBullets(cleanText(k));
+                        const val = stripLeadingBullets(cleanText(String(v)));
+                        addText(`• ${key}: ${val}`, 10, false, indent);
+                      });
+                    } else if (content) {
+                      const text = String(content);
+                      // Split by newlines and add as separate bullet points
+                      text.split('\n').filter(line => line.trim()).forEach(line => {
+                        const cleanLine = stripLeadingBullets(cleanText(line));
+                        addText(`• ${cleanLine}`, 10, false, indent);
+                      });
+                    }
+                  };
+
+                  addBulletPoints(keyStrengths);
+                }
+
+                // Limitations / Cons (check many possible keys)
+                const limitationKeys = ['limitations', 'limitation', 'cons', 'cons_list', 'consList', 'weaknesses', 'drawbacks', 'tradeoffs', 'constraints', 'limitations_list', 'negativePoints', 'negative_points', 'limits', 'concerns', 'concern', 'concerns_list', 'issues', 'issue_list', 'key_limitations', 'keyLimitations', 'key-limitations'];
+                let limitations: any = null;
+                for (const k of limitationKeys) {
+                  if (product[k]) { limitations = product[k]; break; }
+                }
+                if (limitations) {
+                  addText('Limitations:', 10, true, 20);
+                  yPos += 2; // Add some spacing
+
+                  const addBulletPoints = (content: any, indent: number = 25) => {
+                    if (Array.isArray(content)) {
+                      content.forEach((item: any) => {
+                        if (item && typeof item === 'object') {
+                          Object.entries(item).forEach(([k, v]) => {
+                            const key = stripLeadingBullets(cleanText(k));
+                            const val = stripLeadingBullets(cleanText(String(v)));
+                            addText(`• ${key}: ${val}`, 10, false, indent);
+                          });
+                        } else if (item) {
+                          const line = stripLeadingBullets(cleanText(String(item)));
+                          addText(`• ${line}`, 10, false, indent);
+                        }
+                      });
+                    } else if (content && typeof content === 'object') {
+                      Object.entries(content).forEach(([k, v]) => {
+                        const key = stripLeadingBullets(cleanText(k));
+                        const val = stripLeadingBullets(cleanText(String(v)));
+                        addText(`• ${key}: ${val}`, 10, false, indent);
+                      });
+                    } else if (content) {
+                      const text = String(content);
+                      // Split by newlines and add as separate bullet points
+                      text.split('\n').filter(line => line.trim()).forEach(line => {
+                        const cleanLine = stripLeadingBullets(cleanText(line));
+                        addText(`• ${cleanLine}`, 10, false, indent);
+                      });
+                    }
+                  };
+
+                  addBulletPoints(limitations);
+                }
+
+                // Price and Price URL extraction helper
+                // Start with any pricing embedded on the product, but prefer pricing saved on the project (tab-specific or global)
+                let price = product.price || product.pricing || product.prices || product.offer || product.offers || product.priceReview;
+                // Try to read pricing saved with the project: project.pricing may be an object keyed by tabId -> { "Vendor-Model": pricing }
+                const projectPricing = project.pricing || project.pricingData || project.pricing_data || null;
+                try {
+                  const keyForPricing = `${vendor}-${pName}`.trim();
+                  if (!price && projectPricing) {
+                    // tab-specific
+                    if (projectPricing[tabId] && projectPricing[tabId][keyForPricing]) {
+                      price = projectPricing[tabId][keyForPricing];
+                    } else if (projectPricing[keyForPricing]) {
+                      // global pricing map
+                      price = projectPricing[keyForPricing];
+                    }
+                  }
+                } catch (e) {
+                  // ignore
+                }
+                let priceStr = '';
+                let priceUrl = '';
+                const findUrl = (obj: any): string | null => {
+                  if (!obj) return null;
+                  if (typeof obj === 'string') {
+                    const s = obj.trim();
+                    if (s.startsWith('http') || s.startsWith('//') || s.includes('http') || s.startsWith('www.')) return s;
+                    return null;
+                  }
+                  if (Array.isArray(obj)) {
+                    for (const item of obj) {
+                      const u = findUrl(item);
+                      if (u) return u;
+                    }
+                  }
+                  if (typeof obj === 'object') {
+                    const urlKeys = ['url', 'link', 'productUrl', 'product_url', 'priceUrl', 'price_url', 'href', 'buyLink', 'purchase_link', 'offerUrl', 'offer_url', 'checkout_url'];
+                    for (const k of urlKeys) {
+                      const v = obj[k];
+                      if (typeof v === 'string' && v.startsWith('http')) return v;
+                    }
+                    // check nested common shapes
+                    if (obj.offers) return findUrl(obj.offers);
+                    if (obj[0]) return findUrl(obj[0]);
+                    // look for any string value that looks like a url
+                    for (const v of Object.values(obj)) {
+                      if (typeof v === 'string' && v.startsWith('http')) return v;
+                    }
+                  }
+                  return null;
+                };
+
                 if (price) {
-                  let priceStr = '';
-                  let priceUrl = '';
                   if (typeof price === 'object') {
-                    priceStr = price.amount ? `${price.amount} ${price.currency || ''}` : (price.price || '');
-                    priceUrl = price.url || price.productUrl || '';
+                    priceStr = price.amount ? `${price.amount} ${price.currency || ''}` : (price.price || price.amount || '');
+                    priceUrl = findUrl(price) || '';
                   } else {
                     priceStr = String(price);
                   }
-
-                  if (priceStr) addText(`Price: ${priceStr}`, 10, false, 20);
-                  if (priceUrl) addText(`Price URL: ${priceUrl}`, 10, false, 20);
                 }
 
-                // Image
-                const topImage = product.topImage || product.top_image || product.topImageUrl || product.top_image_url;
+                // Also look for price URL or product purchase links on the product object
+                if (!priceUrl) {
+                  priceUrl = findUrl(product) || '';
+                }
+
+                // If we still don't have a priceUrl, try to find a vendor-specific link
+                const findVendorLink = (obj: any, vendorName?: string): string | null => {
+                  if (!obj || !vendorName) return null;
+                  const vn = String(vendorName).toLowerCase();
+
+                  // If the object has a direct link and a source/vendor that matches, prefer it
+                  if (typeof obj.link === 'string' && (String(obj.source || '').toLowerCase().includes(vn) || String(obj.vendor || '').toLowerCase().includes(vn))) {
+                    return obj.link;
+                  }
+
+                  // If the object itself contains a url-like field, and source/vendor matches, return it
+                  const urlKeys = ['url', 'link', 'productUrl', 'product_url', 'priceUrl', 'price_url', 'href', 'buyLink', 'purchase_link', 'offerUrl', 'offer_url', 'checkout_url'];
+                  for (const k of urlKeys) {
+                    if (typeof obj[k] === 'string' && String(obj.source || '').toLowerCase().includes(vn)) return obj[k];
+                    if (typeof obj[k] === 'string' && String(obj.vendor || '').toLowerCase().includes(vn)) return obj[k];
+                  }
+
+                  // Search arrays like results/pricing for an entry that matches the vendor
+                  const candidates = Array.isArray(obj.results) ? obj.results : (Array.isArray(obj.pricing?.results) ? obj.pricing.results : (Array.isArray(obj.priceReview?.results) ? obj.priceReview.results : null));
+                  if (Array.isArray(candidates)) {
+                    for (const entry of candidates) {
+                      const src = String(entry.source || entry.vendor || '').toLowerCase();
+                      if (src.includes(vn)) {
+                        // prefer explicit link fields
+                        if (typeof entry.link === 'string') return entry.link;
+                        const maybe = findUrl(entry);
+                        if (maybe) return maybe;
+                      }
+                    }
+                  }
+
+                  // As a last resort, if the object has nested entries, try to find any url where the entry's source/vendor matches
+                  const searchNested = (o: any): string | null => {
+                    if (!o || typeof o !== 'object') return null;
+                    if (Array.isArray(o)) {
+                      for (const it of o) {
+                        const r = searchNested(it);
+                        if (r) return r;
+                      }
+                    } else {
+                      if (typeof o.source === 'string' && String(o.source).toLowerCase().includes(vn) && typeof o.link === 'string') return o.link;
+                      if (typeof o.vendor === 'string' && String(o.vendor).toLowerCase().includes(vn) && typeof o.link === 'string') return o.link;
+                      for (const val of Object.values(o)) {
+                        if (typeof val === 'string' && (val.startsWith('http') || val.startsWith('www.'))) return val as string;
+                        if (typeof val === 'object') {
+                          const r = searchNested(val);
+                          if (r) return r;
+                        }
+                      }
+                    }
+                    return null;
+                  };
+
+                  return searchNested(obj) || null;
+                };
+
+                if (!priceUrl && vendor) {
+                  const vendorFound = findVendorLink(product, vendor);
+                  if (vendorFound) priceUrl = vendorFound;
+                }
+
+                // Try to extract price URL from priceReview/pricing results if present
+                const extractUrlFromResults = (r: any) => {
+                  if (!r) return null;
+                  if (Array.isArray(r)) {
+                    for (const item of r) {
+                      if (!item) continue;
+                      if (typeof item === 'string' && (item.startsWith('http') || item.includes('http') || item.startsWith('www.'))) return item;
+                      if (item.link && (String(item.link).startsWith('http') || String(item.link).includes('http'))) return String(item.link);
+                      if (item.url && (String(item.url).startsWith('http') || String(item.url).includes('http'))) return String(item.url);
+                    }
+                  } else if (typeof r === 'object') {
+                    if (r.link && (String(r.link).startsWith('http') || String(r.link).includes('http'))) return String(r.link);
+                    if (r.url && (String(r.url).startsWith('http') || String(r.url).includes('http'))) return String(r.url);
+                    // check nested
+                    for (const val of Object.values(r)) {
+                      if (typeof val === 'string' && (val.startsWith('http') || val.includes('http') || val.startsWith('www.'))) return val;
+                      if (Array.isArray(val)) {
+                        const u = extractUrlFromResults(val);
+                        if (u) return u;
+                      }
+                    }
+                  }
+                  return null;
+                };
+
+                if (!priceUrl) {
+                  // try product.priceReview or product.pricing structures
+                  const pr = (product as any).priceReview || (product as any).pricing || (product as any).price || (product as any).prices;
+                  const found = extractUrlFromResults(pr);
+                  if (found) priceUrl = found;
+                }
+
+                if (!priceUrl && product.priceReview && Array.isArray(product.priceReview.results)) {
+                  const found = extractUrlFromResults(product.priceReview.results);
+                  if (found) priceUrl = found;
+                }
+
+                if (!priceUrl && (product as any).pricing && Array.isArray((product as any).pricing.results)) {
+                  const found = extractUrlFromResults((product as any).pricing.results);
+                  if (found) priceUrl = found;
+                }
+
+                // Pricing export removed (per user request)
+
+                // Image (print clickable URL)
+                const topImage = product.topImage || product.top_image || product.topImageUrl || product.top_image_url || product.image || product.images;
                 if (topImage) {
-                  const url = typeof topImage === 'string' ? topImage : (topImage.url || topImage.src);
-                  if (url) addText(`Image URL: ${url}`, 10, false, 20);
+                  const url = typeof topImage === 'string' ? topImage : (topImage.url || topImage.src || (Array.isArray(topImage) && topImage[0]) || '');
+                  if (url) addInlineLink('Image URL:', url, 10, 20);
                 }
 
                 // Specs
                 if (product.specifications && Object.keys(product.specifications).length > 0) {
                   addText("Specifications:", 10, true, 20);
                   Object.entries(product.specifications).forEach(([k, v]) => {
-                    addText(`- ${k}: ${v}`, 10, false, 25);
+                    // If value is object/array, stringify or join
+                    let valDisplay = v;
+                    if (typeof v === 'object') {
+                      valDisplay = Array.isArray(v) ? v.join(', ') : JSON.stringify(v);
+                    }
+                    addText(`- ${k}: ${valDisplay}`, 10, false, 25);
                   });
                 }
               });
@@ -520,23 +937,12 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({
         });
       }
 
-      // --- Feedback ---
-      const feedbackEntries = project.feedback_entries || (project as any).feedbackEntries;
-      if (feedbackEntries && Array.isArray(feedbackEntries) && feedbackEntries.length > 0) {
-        addSectionHeader("User Feedback");
-        feedbackEntries.forEach((entry: any, idx: number) => {
-          const type = entry.type || 'General';
-          const content = entry.content || entry.feedback || '';
-          const date = entry.timestamp || entry.created_at || '';
-
-          addText(`${idx + 1}. [${type}] ${date ? `(${new Date(date).toLocaleDateString()})` : ''}`, 11, true, 5);
-          addText(content, 10, false, 8);
-          yPos += 2;
-        });
-      }
+      // Feedback section intentionally omitted from PDF export
 
       // Save PDF
-      doc.save(`${projectName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_export.pdf`);
+
+      const safeName = (projectName || 'project').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      doc.save(`${safeName}.pdf`);
 
       toast({
         title: "Export Successful",
