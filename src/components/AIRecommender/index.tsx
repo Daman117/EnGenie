@@ -1077,7 +1077,7 @@ const AIRecommender = ({
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-24 left-4 z-20 bg-background border shadow-lg hover:bg-background/90"
+        className="fixed top-24 right-4 z-50 bg-background border shadow-lg hover:bg-background/90"
         onClick={() => setIsDocked(!isDocked)}
         aria-label={isDocked ? "Expand left panel" : "Collapse left panel"}
       >
