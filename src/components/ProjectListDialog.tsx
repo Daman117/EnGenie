@@ -984,7 +984,7 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({
           <DialogDescription className="sr-only">Select a project from the list to open it.</DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto pr-2">
+        <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin" />
