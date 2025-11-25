@@ -262,10 +262,10 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({
       const cleanText = (input: string | null | undefined) => {
         if (input === null || input === undefined) return '';
         let s = String(input);
-        
+
         // Remove HTML tags
         s = s.replace(/<[^>]*>/g, '');
-        
+
         // Remove markdown formatting characters
         s = s.replace(/\*\*/g, '');  // Remove **
         s = s.replace(/_/g, '');     // Remove _
@@ -273,13 +273,13 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({
         s = s.replace(/#/g, '');     // Remove #
         s = s.replace(/~~/g, '');
         s = s.replace(/\/\*\*/g, '');    // Remove ~~
-        
+
         // Clean up whitespace and newlines
         s = s.replace(/[\t\r]+/g, ' ')  // Tabs and carriage returns to space
-             .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
-             .replace(/ {2,}/g, ' ')      // Multiple spaces to single
-             .trim();
-        
+          .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
+          .replace(/ {2,}/g, ' ')      // Multiple spaces to single
+          .trim();
+
         return s;
       };
 
@@ -978,7 +978,7 @@ const ProjectListDialog: React.FC<ProjectListDialogProps> = ({
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+      <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Open Project</DialogTitle>
           <DialogDescription className="sr-only">Select a project from the list to open it.</DialogDescription>
