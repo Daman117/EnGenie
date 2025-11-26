@@ -83,9 +83,46 @@ const Project = () => {
   const projectScrollRef = useRef<HTMLDivElement | null>(null);
   const [savedScrollPosition, setSavedScrollPosition] = useState(0);
 
+  // NEW: For generic product type images
+  const [genericImages, setGenericImages] = useState<Record<string, string>>({});
+
   const capitalizeFirstLetter = (str?: string): string => {
     if (!str) return "";
     return str.charAt(0).toUpperCase() + str.slice(1);
+  };
+
+  // Fetch generic product type images
+  const fetchGenericImages = async (productTypes: string[]) => {
+    const uniqueTypes = [...new Set(productTypes)]; // Remove duplicates
+    const imagePromises = uniqueTypes.map(async (productType) => {
+      try {
+        const encodedType = encodeURIComponent(productType);
+        const response = await fetch(`${BASE_URL}/api/generic_image/${encodedType}`, {
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.image) {
+            return { productType, imageUrl: data.image.url };
+          }
+        }
+        return { productType, imageUrl: null };
+      } catch (error) {
+        console.error(`Failed to fetch generic image for ${productType}:`, error);
+        return { productType, imageUrl: null };
+      }
+    });
+
+    const results = await Promise.all(imagePromises);
+    const imagesMap: Record<string, string> = {};
+    results.forEach(({ productType, imageUrl }) => {
+      if (imageUrl) {
+        imagesMap[productType] = imageUrl;
+      }
+    });
+
+    setGenericImages(imagesMap);
   };
 
   // Escape string for use in RegExp
@@ -160,6 +197,19 @@ const Project = () => {
       // Set the project name from the API response, fallback to 'Project' if not provided
       if (response.projectName) {
         setProjectName(response.projectName);
+      }
+
+      // Fetch generic images for identified product types
+      const productTypes: string[] = [];
+      (response.instruments || []).forEach((inst: any) => {
+        if (inst.category) productTypes.push(inst.category);
+      });
+      (response.accessories || []).forEach((acc: any) => {
+        if (acc.category) productTypes.push(acc.category);
+      });
+
+      if (productTypes.length > 0) {
+        fetchGenericImages(productTypes);
       }
 
       toast({
@@ -402,6 +452,7 @@ const Project = () => {
         search_tabs: searchTabs,
         conversation_histories: conversationHistories,
         collected_data: collectedDataAll,
+        generic_images: genericImages,
         current_step: activeTab === 'project' ? (showResults ? 'showSummary' : 'initialInput') : 'search',
         active_tab: activeTab === 'project' ? 'Project' : (searchTabs.find(t => t.id === activeTab)?.title || activeTab), // Save tab name instead of ID
         analysis_results: analysisResults,
@@ -679,7 +730,17 @@ const Project = () => {
       setInstruments(project.identifiedInstruments || project.identified_instruments || []);
 
       console.log('Restoring accessories count:', (project.identifiedAccessories || project.identified_accessories || []).length);
+      console.log('Restoring accessories count:', (project.identifiedAccessories || project.identified_accessories || []).length);
       setAccessories(project.identifiedAccessories || project.identified_accessories || []);
+
+      // Restore generic images
+      const savedGenericImages = project.genericImages || project.generic_images || {};
+      if (Object.keys(savedGenericImages).length > 0) {
+        console.log('Restoring generic images:', Object.keys(savedGenericImages).length);
+        setGenericImages(savedGenericImages);
+      } else {
+        setGenericImages({});
+      }
 
       // Show results if we have instruments/accessories
       const instruments = project.identifiedInstruments || project.identified_instruments || [];
@@ -1123,22 +1184,17 @@ const Project = () => {
 
             {/* Profile */}
             <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="text-sm font-semibold text-muted-foreground hover:bg-secondary/50 p-2"
-                    // title={profileButtonLabel}
-                    >
-                      <div className="w-7 h-7 rounded-full bg-ai-primary flex items-center justify-center text-white font-bold">
-                        {profileButtonLabel.charAt(0)}
-                      </div>
-                    </Button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent><p>Profile</p></TooltipContent>
-              </Tooltip>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="text-sm font-semibold text-muted-foreground hover:bg-secondary/50 p-2"
+                // title={profileButtonLabel}
+                >
+                  <div className="w-7 h-7 rounded-full bg-ai-primary flex items-center justify-center text-white font-bold">
+                    {profileButtonLabel.charAt(0)}
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
               <DropdownMenuContent
                 className="w-56 bg-popover rounded-xl shadow-xl border border-border mt-1"
                 align="end"
@@ -1348,6 +1404,21 @@ const Project = () => {
                                 </Button>
                               </div>
 
+                              {/* Generic Product Type Image */}
+                              {genericImages[instrument.category] && (
+                                <div className="flex justify-center my-4">
+                                  <img
+                                    src={genericImages[instrument.category]}
+                                    alt={`Generic ${instrument.category}`}
+                                    className="w-48 h-48 object-contain rounded-lg shadow-md"
+                                    onError={(e) => {
+                                      // Hide image if it fails to load
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                </div>
+                              )}
+
                               {/* Specifications */}
                               {Object.keys(instrument.specifications).length > 0 && (
                                 <div className="space-y-2">
@@ -1405,6 +1476,21 @@ const Project = () => {
                                   Search
                                 </Button>
                               </div>
+
+                              {/* Generic Product Type Image */}
+                              {genericImages[accessory.category] && (
+                                <div className="flex justify-center my-4">
+                                  <img
+                                    src={genericImages[accessory.category]}
+                                    alt={`Generic ${accessory.category}`}
+                                    className="w-48 h-48 object-contain rounded-lg shadow-md"
+                                    onError={(e) => {
+                                      // Hide image if it fails to load
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                </div>
+                              )}
 
                               {/* Specifications */}
                               {Object.keys(accessory.specifications).length > 0 && (
