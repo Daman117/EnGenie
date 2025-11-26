@@ -1138,7 +1138,7 @@ const Project = () => {
           {/* Right side - Action Buttons and Profile */}
           <div className="flex items-center gap-2">
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <Button
                   variant="outline"
                   size="sm"
@@ -1152,7 +1152,7 @@ const Project = () => {
             </Tooltip>
 
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <Button variant="outline" size="sm" onClick={handleNewProject} className="rounded-lg p-2">
                   <FileText className="h-4 w-4" />
                 </Button>
@@ -1167,12 +1167,11 @@ const Project = () => {
               onProjectDelete={handleProjectDelete}
             >
               <Tooltip>
-                <TooltipTrigger asChild>
+                <TooltipTrigger>
                   <Button
                     variant="outline"
                     size="sm"
                     className="rounded-lg p-2"
-                    title="Open"
                     onClick={() => setIsProjectListOpen(true)}
                   >
                     <FolderOpen className="h-4 w-4" />
@@ -1183,48 +1182,52 @@ const Project = () => {
             </ProjectListDialog>
 
             {/* Profile */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="text-sm font-semibold text-muted-foreground hover:bg-secondary/50 p-2"
-                // title={profileButtonLabel}
-                >
-                  <div className="w-7 h-7 rounded-full bg-ai-primary flex items-center justify-center text-white font-bold">
-                    {profileButtonLabel.charAt(0)}
-                  </div>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-56 bg-popover rounded-xl shadow-xl border border-border mt-1"
-                align="end"
-              >
-                <DropdownMenuLabel className="flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
-                  {profileEmail}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-
-                {user?.role?.toLowerCase() === "admin" && (
-                  <>
-                    <DropdownMenuItem className="flex gap-2" onClick={() => navigate("/admin")}>
-                      <Bot className="h-4 w-4" />
-                      Approve Sign Ups
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="flex gap-2" onClick={() => navigate("/upload")}>
-                      <Upload className="h-4 w-4" />
-                      Upload
-                    </DropdownMenuItem>
+            <Tooltip>
+              <TooltipTrigger>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="text-sm font-semibold text-muted-foreground hover:bg-secondary/50 p-2"
+                    >
+                      <div className="w-7 h-7 rounded-full bg-ai-primary flex items-center justify-center text-white font-bold">
+                        {profileButtonLabel.charAt(0)}
+                      </div>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    className="w-56 bg-popover rounded-xl shadow-xl border border-border mt-1"
+                    align="end"
+                  >
+                    <DropdownMenuLabel className="flex items-center gap-2">
+                      <Mail className="w-4 h-4" />
+                      {profileEmail}
+                    </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                  </>
-                )}
 
-                <DropdownMenuItem className="flex gap-2" onClick={logout}>
-                  <LogOut className="h-4 w-4" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                    {user?.role?.toLowerCase() === "admin" && (
+                      <>
+                        <DropdownMenuItem className="flex gap-2" onClick={() => navigate("/admin")}>
+                          <Bot className="h-4 w-4" />
+                          Approve Sign Ups
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="flex gap-2" onClick={() => navigate("/upload")}>
+                          <Upload className="h-4 w-4" />
+                          Upload
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+
+                    <DropdownMenuItem className="flex gap-2" onClick={logout}>
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TooltipTrigger>
+              <TooltipContent><p>Profile</p></TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </header>
