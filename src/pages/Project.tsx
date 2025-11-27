@@ -1138,7 +1138,7 @@ const Project = () => {
           {/* Right side - Action Buttons and Profile */}
           <div className="flex items-center gap-2">
             <Tooltip>
-              <TooltipTrigger>
+              <TooltipTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
@@ -1152,7 +1152,7 @@ const Project = () => {
             </Tooltip>
 
             <Tooltip>
-              <TooltipTrigger>
+              <TooltipTrigger asChild>
                 <Button variant="outline" size="sm" onClick={handleNewProject} className="rounded-lg p-2">
                   <FileText className="h-4 w-4" />
                 </Button>
@@ -1167,7 +1167,7 @@ const Project = () => {
               onProjectDelete={handleProjectDelete}
             >
               <Tooltip>
-                <TooltipTrigger>
+                <TooltipTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
