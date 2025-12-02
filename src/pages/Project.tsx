@@ -92,38 +92,51 @@ const Project = () => {
   };
 
   // Fetch generic product type images
-  const fetchGenericImages = async (productTypes: string[]) => {
-    const uniqueTypes = [...new Set(productTypes)]; // Remove duplicates
-    const imagePromises = uniqueTypes.map(async (productType) => {
-      try {
-        const encodedType = encodeURIComponent(productType);
-        const response = await fetch(`${BASE_URL}/api/generic_image/${encodedType}`, {
-          credentials: 'include'
-        });
+const fetchGenericImages = async (productTypes: string[]) => {
+  const uniqueTypes = [...new Set(productTypes)]; // Remove duplicates
 
-        if (response.ok) {
+  const imagePromises = uniqueTypes.map(async (productType) => {
+    try {
+      const encodedType = encodeURIComponent(productType);
+      const response = await fetch(`${BASE_URL}/api/generic_image/${encodedType}`, {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const contentType = response.headers.get("content-type") || "";
+
+        // 🟢 LOCAL — JSON response
+        if (contentType.includes("application/json")) {
           const data = await response.json();
           if (data.success && data.image) {
             return { productType, imageUrl: data.image.url };
           }
         }
-        return { productType, imageUrl: null };
-      } catch (error) {
-        console.error(`Failed to fetch generic image for ${productType}:`, error);
-        return { productType, imageUrl: null };
-      }
-    });
 
-    const results = await Promise.all(imagePromises);
-    const imagesMap: Record<string, string> = {};
-    results.forEach(({ productType, imageUrl }) => {
-      if (imageUrl) {
-        imagesMap[productType] = imageUrl;
+        // 🟢 PRODUCTION — raw image response
+        // Fallback: use direct URL
+        return { productType, imageUrl: `${BASE_URL}/api/generic_image/${encodedType}` };
       }
-    });
 
-    setGenericImages(imagesMap);
-  };
+      return { productType, imageUrl: null };
+    } catch (error) {
+      console.error(`Failed to fetch generic image for ${productType}:`, error);
+      return { productType, imageUrl: null };
+    }
+  });
+
+  const results = await Promise.all(imagePromises);
+  const imagesMap: Record<string, string> = {};
+
+  results.forEach(({ productType, imageUrl }) => {
+    if (imageUrl) {
+      imagesMap[productType] = imageUrl;
+    }
+  });
+
+  setGenericImages(imagesMap);
+};
+
 
   // Escape string for use in RegExp
   const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
