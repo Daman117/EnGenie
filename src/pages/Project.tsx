@@ -110,19 +110,19 @@ const fetchGenericImages = async (productTypes: string[]) => {
       }
 
       // Detect response type
-      const contentType = response.headers.get("content-type") || "";
+      // const contentType = response.headers.get("content-type") || "";
 
-      // 🟢 LOCAL: API returns JSON
-      if (contentType.includes("application/json")) {
-        try {
-          const data = await response.json();
-          if (data.success && data.image) {
-            return { productType, imageUrl: data.image.url };
-          }
-        } catch (err) {
-          console.warn(`JSON parse failed for ${productType} (fallback to direct URL)`);
-        }
-      }
+      // // 🟢 LOCAL: API returns JSON
+      // if (contentType.includes("application/json")) {
+      //   try {
+      //     const data = await response.json();
+      //     if (data.success && data.image) {
+      //       return { productType, imageUrl: data.image.url };
+      //     }
+      //   } catch (err) {
+      //     console.warn(`JSON parse failed for ${productType} (fallback to direct URL)`);
+      //   }
+      // }
 
       // 🟢 PRODUCTION: API returns image directly
       return { productType, imageUrl: url };
