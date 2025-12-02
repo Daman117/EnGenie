@@ -92,33 +92,41 @@ const Project = () => {
   };
 
   // Fetch generic product type images
+// Fetch generic product type images
 const fetchGenericImages = async (productTypes: string[]) => {
   const uniqueTypes = [...new Set(productTypes)]; // Remove duplicates
 
   const imagePromises = uniqueTypes.map(async (productType) => {
     try {
       const encodedType = encodeURIComponent(productType);
-      const response = await fetch(`${BASE_URL}/api/generic_image/${encodedType}`, {
+      const url = `${BASE_URL}/api/generic_image/${encodedType}`;
+
+      const response = await fetch(url, {
         credentials: 'include'
       });
 
-      if (response.ok) {
-        const contentType = response.headers.get("content-type") || "";
+      if (!response.ok) {
+        return { productType, imageUrl: null };
+      }
 
-        // 🟢 LOCAL — JSON response
-        if (contentType.includes("application/json")) {
+      // Detect response type
+      const contentType = response.headers.get("content-type") || "";
+
+      // 🟢 LOCAL: API returns JSON
+      if (contentType.includes("application/json")) {
+        try {
           const data = await response.json();
           if (data.success && data.image) {
             return { productType, imageUrl: data.image.url };
           }
+        } catch (err) {
+          console.warn(`JSON parse failed for ${productType} (fallback to direct URL)`);
         }
-
-        // 🟢 PRODUCTION — raw image response
-        // Fallback: use direct URL
-        return { productType, imageUrl: `${BASE_URL}/api/generic_image/${encodedType}` };
       }
 
-      return { productType, imageUrl: null };
+      // 🟢 PRODUCTION: API returns image directly
+      return { productType, imageUrl: url };
+
     } catch (error) {
       console.error(`Failed to fetch generic image for ${productType}:`, error);
       return { productType, imageUrl: null };
@@ -126,6 +134,7 @@ const fetchGenericImages = async (productTypes: string[]) => {
   });
 
   const results = await Promise.all(imagePromises);
+
   const imagesMap: Record<string, string> = {};
 
   results.forEach(({ productType, imageUrl }) => {
