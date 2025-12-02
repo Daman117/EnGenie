@@ -1417,10 +1417,10 @@ const Project = () => {
                                     src={genericImages[instrument.category]}
                                     alt={`Generic ${instrument.category}`}
                                     className="w-48 h-48 object-contain rounded-lg shadow-md"
-                                    onError={(e) => {
+                                    {/* onError={(e) => {
                                       // Hide image if it fails to load
                                       e.currentTarget.style.display = 'none';
-                                    }}
+                                    }} */}
                                   />
                                 </div>
                               )}
