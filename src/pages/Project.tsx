@@ -91,6 +91,21 @@ const Project = () => {
     return str.charAt(0).toUpperCase() + str.slice(1);
   };
 
+  // Helper to convert relative image URLs to absolute URLs
+  const getAbsoluteImageUrl = (url: string | undefined | null): string | undefined => {
+    if (!url) return undefined;
+
+    // Already absolute URL
+    if (url.startsWith('http') || url.startsWith('data:')) {
+      return url;
+    }
+
+    // Convert relative URL to absolute
+    const baseUrl = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${path}`;
+  };
+
   // Fetch generic product type images
   const fetchGenericImages = async (productTypes: string[]) => {
     const uniqueTypes = [...new Set(productTypes)]; // Remove duplicates
@@ -104,7 +119,9 @@ const Project = () => {
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.image) {
-            return { productType, imageUrl: data.image.url };
+            // Convert relative URLs to absolute URLs for deployment compatibility
+            const absoluteUrl = getAbsoluteImageUrl(data.image.url);
+            return { productType, imageUrl: absoluteUrl };
           }
         }
         return { productType, imageUrl: null };
@@ -740,7 +757,15 @@ const Project = () => {
       const savedGenericImages = project.genericImages || project.generic_images || {};
       if (Object.keys(savedGenericImages).length > 0) {
         console.log('Restoring generic images:', Object.keys(savedGenericImages).length);
-        setGenericImages(savedGenericImages);
+        // Convert all relative URLs to absolute URLs for deployment compatibility
+        const absoluteGenericImages: Record<string, string> = {};
+        Object.entries(savedGenericImages).forEach(([key, url]) => {
+          const absoluteUrl = getAbsoluteImageUrl(url as string);
+          if (absoluteUrl) {
+            absoluteGenericImages[key] = absoluteUrl;
+          }
+        });
+        setGenericImages(absoluteGenericImages);
       } else {
         setGenericImages({});
       }
