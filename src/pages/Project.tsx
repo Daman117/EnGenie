@@ -106,12 +106,19 @@ const Project = () => {
     return `${baseUrl}${path}`;
   };
 
-  // Fetch generic product type images
+  // Fetch generic product type images (sequential to avoid rate limiting)
   const fetchGenericImages = async (productTypes: string[]) => {
     const uniqueTypes = [...new Set(productTypes)]; // Remove duplicates
-    const imagePromises = uniqueTypes.map(async (productType) => {
+    const imagesMap: Record<string, string> = {};
+
+
+    // Process sequentially to avoid rate limiting on external APIs
+    for (let i = 0; i < uniqueTypes.length; i++) {
+      const productType = uniqueTypes[i];
+
       try {
         const encodedType = encodeURIComponent(productType);
+
         const response = await fetch(`${BASE_URL}/api/generic_image/${encodedType}`, {
           credentials: 'include'
         });
@@ -121,24 +128,24 @@ const Project = () => {
           if (data.success && data.image) {
             // Convert relative URLs to absolute URLs for deployment compatibility
             const absoluteUrl = getAbsoluteImageUrl(data.image.url);
-            return { productType, imageUrl: absoluteUrl };
+            if (absoluteUrl) {
+              imagesMap[productType] = absoluteUrl;
+            }
           }
+        } else {
+          console.warn(`[GENERIC_IMAGES] ✗ Failed (${response.status}): ${productType}`);
         }
-        return { productType, imageUrl: null };
       } catch (error) {
-        console.error(`Failed to fetch generic image for ${productType}:`, error);
-        return { productType, imageUrl: null };
+        console.error(`[GENERIC_IMAGES] ✗ Error fetching ${productType}:`, error);
       }
-    });
 
-    const results = await Promise.all(imagePromises);
-    const imagesMap: Record<string, string> = {};
-    results.forEach(({ productType, imageUrl }) => {
-      if (imageUrl) {
-        imagesMap[productType] = imageUrl;
+      // Add delay between requests to avoid rate limiting (except for last item)
+      if (i < uniqueTypes.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
       }
-    });
+    }
 
+    console.log(`[GENERIC_IMAGES] Completed: ${Object.keys(imagesMap).length}/${uniqueTypes.length} images fetched`);
     setGenericImages(imagesMap);
   };
 
