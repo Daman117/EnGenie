@@ -101,13 +101,13 @@ const fetchGenericImages = async (productTypes: string[]) => {
       const encodedType = encodeURIComponent(productType);
       const url = `${BASE_URL}/api/generic_image/${encodedType}`;
 
-      const response = await fetch(url, {
-        credentials: 'include'
-      });
+      // const response = await fetch(url, {
+      //   credentials: 'include'
+      // });
 
-      if (!response.ok) {
-        return { productType, imageUrl: null };
-      }
+      // if (!response.ok) {
+      //   return { productType, imageUrl: null };
+      // }
 
       // Detect response type
       // const contentType = response.headers.get("content-type") || "";
