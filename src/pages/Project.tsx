@@ -92,51 +92,38 @@ const Project = () => {
   };
 
   // Fetch generic product type images
-  // Fetch generic product type images
-const fetchGenericImages = async (productTypes: string[]) => {
-  const uniqueTypes = [...new Set(productTypes)];
-  const imagePromises = uniqueTypes.map(async (productType) => {
-    try {
-      const encodedType = encodeURIComponent(productType);
-      const response = await fetch(`${BASE_URL}/api/generic_image/${encodedType}`, {
-        credentials: 'include'
-      });
+  const fetchGenericImages = async (productTypes: string[]) => {
+    const uniqueTypes = [...new Set(productTypes)]; // Remove duplicates
+    const imagePromises = uniqueTypes.map(async (productType) => {
+      try {
+        const encodedType = encodeURIComponent(productType);
+        const response = await fetch(`${BASE_URL}/api/generic_image/${encodedType}`, {
+          credentials: 'include'
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-
-        if (data.success && data.image && data.image.file_id) {
-          // 👇 Build direct image endpoint URL
-          const imgUrl = `${BASE_URL}/api/images/${data.image.file_id}`;
-          return { productType, imageUrl: imgUrl };
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.image) {
+            return { productType, imageUrl: data.image.url };
+          }
         }
-
-        if (data.success && data.image && data.image.url) {
-          // 👇 Also support external URLs
-          return { productType, imageUrl: data.image.url };
-        }
+        return { productType, imageUrl: null };
+      } catch (error) {
+        console.error(`Failed to fetch generic image for ${productType}:`, error);
+        return { productType, imageUrl: null };
       }
+    });
 
-      return { productType, imageUrl: null };
-    } catch (error) {
-      console.error(`Failed to fetch generic image for ${productType}:`, error);
-      return { productType, imageUrl: null };
-    }
-  });
+    const results = await Promise.all(imagePromises);
+    const imagesMap: Record<string, string> = {};
+    results.forEach(({ productType, imageUrl }) => {
+      if (imageUrl) {
+        imagesMap[productType] = imageUrl;
+      }
+    });
 
-  const results = await Promise.all(imagePromises);
-  const imagesMap: Record<string, string> = {};
-
-  results.forEach(({ productType, imageUrl }) => {
-    if (imageUrl) {
-      imagesMap[productType] = imageUrl;
-    }
-  });
-
-  setGenericImages(imagesMap);
-};
-
-
+    setGenericImages(imagesMap);
+  };
 
   // Escape string for use in RegExp
   const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
