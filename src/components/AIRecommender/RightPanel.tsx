@@ -13,13 +13,13 @@ import ReactMarkdown from "react-markdown";
 import "./ImageComponents.css";
 
 const cleanImageUrl = (url: string): string => {
-    if (!url) return "";
-    // Check and remove the non-standard x-raw-image:/// scheme
-    const prefix = "x-raw-image:///";
-    if (url.startsWith(prefix)) {
-        return url.substring(prefix.length);
-    }
-    return url;
+  if (!url) return "";
+  // Check and remove the non-standard x-raw-image:/// scheme
+  const prefix = "x-raw-image:///";
+  if (url.startsWith(prefix)) {
+    return url.substring(prefix.length);
+  }
+  return url;
 };
 // Type that allows images to be either objects or strings
 type VendorImage = { fileName: string; url: string; productKey?: string } | string;
@@ -47,45 +47,46 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, isOpen, onClose, pr
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-800 max-w-6xl max-h-[90vh] rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">{productName} - All Images</h3>
-          <button 
-            onClick={onClose}
-            className="text-2xl font-bold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            ×
-          </button>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4 max-h-[70vh] overflow-y-auto">
-          {images.map((image, index) => {
-              // --- FIX APPLIED HERE for ImageGallery ---
-              const cleanUrl = cleanImageUrl(image.url);
-              const finalSrc = cleanUrl.startsWith("/") ? `${BASE_URL}${cleanUrl}` : cleanUrl;
-              // ------------------------------------------
+    <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-800 max-w-6xl max-h-[90vh] rounded-lg overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">{productName} - All Images</h3>
+          <button
+            onClick={onClose}
+            className="text-2xl font-bold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            ×
+          </button>
+        </div>
 
-              return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4 max-h-[70vh] overflow-y-auto">
+          {images.map((image, index) => {
+            // --- FIX APPLIED HERE for ImageGallery ---
+            const cleanUrl = cleanImageUrl(image.url);
+            const finalSrc = cleanUrl.startsWith("/") ? `${BASE_URL}${cleanUrl}` : cleanUrl;
+            // ------------------------------------------
+
+            return (
               <div key={index} className="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden">
-              <img 
-                src={finalSrc} 
-                alt={image.title}
-                className="w-full h-48 object-cover"
-              />
-              <div className="p-3">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{image.title}</p>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded">{getQualityBadge(image.source)}</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{image.domain}</span>
-                </div>
-              </div>
-            </div>
-          );})}
-        </div>
-      </div>
-    </div>
-  );
+                <img
+                  src={finalSrc}
+                  alt={image.title}
+                  className="w-full h-48 object-cover"
+                />
+                <div className="p-3">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{image.title}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded">{getQualityBadge(image.source)}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{image.domain}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export type RightPanelProps = {
@@ -330,25 +331,25 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const createNameVariations = (name: string): string[] => {
     const variations = new Set<string>();
     const normalized = normalizeText(name);
-    
+
     // Add the fully normalized version
     variations.add(normalized);
-    
+
     // Add version without numbers
     variations.add(normalized.replace(/[0-9]/g, ""));
-    
+
     // Add version with just letters and first number group
     const firstNumberMatch = name.match(/\d+/);
     if (firstNumberMatch) {
       variations.add(normalizeText(name.split(firstNumberMatch[0])[0] + firstNumberMatch[0]));
     }
-    
+
     // Add first word only
     const firstWord = name.split(/[\s\-_\.]/)[0];
     if (firstWord) {
       variations.add(normalizeText(firstWord));
     }
-    
+
     return Array.from(variations).filter(v => v.length > 0);
   };
 
@@ -362,6 +363,11 @@ const RightPanel: React.FC<RightPanelProps> = ({
     return out;
   }, [vendors]);
 
+  // Thresholds for match quality
+  // Exact matches: No score threshold - show ALL products where requirementsMatch === true
+  // Approximate matches: Minimum score of 50% to ensure reasonable quality
+  const APPROXIMATE_THRESHOLD = 50;
+
   const requirementsMatchMap = useMemo(() => {
     const map = new Map<string, boolean>();
     analysisResult?.vendorAnalysis?.vendorMatches?.forEach((match) => {
@@ -370,24 +376,64 @@ const RightPanel: React.FC<RightPanelProps> = ({
     return map;
   }, [analysisResult]);
 
+  // Split products into exact and approximate matches
+  const { exactMatches, approximateMatches, displayMode } = useMemo(() => {
+    if (!analysisResult?.overallRanking?.rankedProducts) {
+      return { exactMatches: [], approximateMatches: [], displayMode: 'exact' as const };
+    }
+
+    // Exact matches: ALL products where requirementsMatch === true (no score threshold)
+    const exact = analysisResult.overallRanking.rankedProducts.filter(
+      (product) => {
+        const matchStatus = requirementsMatchMap.get(`${product.vendor}-${product.productName}`) ?? product.requirementsMatch;
+        return matchStatus === true;  // No score requirement for exact matches
+      }
+    );
+
+    // Approximate matches: requirementsMatch === false AND score >= 50%
+    const approximate = analysisResult.overallRanking.rankedProducts.filter(
+      (product) => {
+        const matchStatus = requirementsMatchMap.get(`${product.vendor}-${product.productName}`) ?? product.requirementsMatch;
+        return matchStatus === false && (product.overallScore ?? 0) >= APPROXIMATE_THRESHOLD;
+      }
+    );
+
+    // Fallback logic: show exact if available, otherwise approximate
+    const mode = exact.length > 0 ? 'exact' : 'approximate';
+
+    return { exactMatches: exact, approximateMatches: approximate, displayMode: mode };
+  }, [analysisResult, requirementsMatchMap]);
+
+  // Determine which products to display based on fallback logic
+  const productsToDisplay = displayMode === 'exact' ? exactMatches : approximateMatches;
+
   const filteredAnalysisResult = analysisResult
     ? {
-        ...analysisResult,
-        vendorAnalysis: {
-          ...analysisResult.vendorAnalysis,
-          vendorMatches: (analysisResult.vendorAnalysis?.vendorMatches ?? []).filter((match) => match.requirementsMatch === true),
-        },
-        overallRanking: {
-          ...analysisResult.overallRanking,
-          rankedProducts: (analysisResult.overallRanking?.rankedProducts ?? [])
-            .filter((product) => (requirementsMatchMap.get(`${product.vendor}-${product.productName}`) ?? product.requirementsMatch) === true)
-            .map((product, index) => ({
-              ...product,
-              rank: index + 1,
-              requirementsMatch: requirementsMatchMap.get(`${product.vendor}-${product.productName}`) ?? product.requirementsMatch,
-            })),
-        },
-      }
+      ...analysisResult,
+      displayMode, // Add display mode to result
+      vendorAnalysis: {
+        ...analysisResult.vendorAnalysis,
+        vendorMatches: (analysisResult.vendorAnalysis?.vendorMatches ?? []).filter((match) => {
+          const isExactMatch = match.requirementsMatch === true;
+          const isApproximateMatch = match.requirementsMatch === false && (match.matchScore ?? 0) >= APPROXIMATE_THRESHOLD;
+
+          // Show exact matches if available, otherwise approximate
+          if (displayMode === 'exact') {
+            return isExactMatch;
+          } else {
+            return isApproximateMatch;
+          }
+        }),
+      },
+      overallRanking: {
+        ...analysisResult.overallRanking,
+        rankedProducts: productsToDisplay.map((product, index) => ({
+          ...product,
+          rank: index + 1,
+          requirementsMatch: requirementsMatchMap.get(`${product.vendor}-${product.productName}`) ?? product.requirementsMatch,
+        })),
+      },
+    }
     : null;
 
   const finalAnalysisResult = filteredAnalysisResult;
@@ -543,9 +589,20 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   return (
     <div className="w-full h-full flex flex-col bg-background text-foreground border-l border-border sticky top-0 right-0 z-20" style={{ minWidth: 0, position: "relative" }}>
+      {/* Fixed dock toggle for right panel (above tabs/content) */}
+      {/* <Button
+        variant="ghost"
+        size="icon"
+        className="fixed top-20 right-8 z-60 bg-background border shadow-lg hover:bg-background/90"
+        onClick={() => setIsDocked(!isDocked)}
+        aria-label={isDocked ? "Expand right panel" : "Collapse right panel"}
+      >
+        {isDocked ? <ChevronLeft /> : <ChevronRight />}
+      </Button> */}
+
       {/* Header space - dock button moved to corner */}
       <div className="flex items-center justify-end py-4 px-3 flex-shrink-0">
-        {/* Dock button moved to corner */}
+        {/* existing header space */}
       </div>
 
 
@@ -605,9 +662,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     {overallRanking.rankedProducts.map((product, index) => {
                       const key = `${product.vendor}-${product.productName}`;
                       const imageData = analysisImages[key];
-                                      const isLoadingImage = false;
-                                      const rawProductImgUrl = imageData?.topImage?.url || (product as any).topImage?.url || (product as any).top_image?.url || product.imageUrl;
-                                      const productImgUrl = cleanImageUrl(rawProductImgUrl);
+                      const isLoadingImage = false;
+                      const rawProductImgUrl = imageData?.topImage?.url || (product as any).topImage?.url || (product as any).top_image?.url || product.imageUrl;
+                      const productImgUrl = cleanImageUrl(rawProductImgUrl);
                       const priceReviews = getPriceReview(product.vendor, product.productName);
                       const fbKey = getProductKey(product.vendor, product.productName);
                       const fb = feedbackState[fbKey] ?? { type: null, comment: "", loading: false, submitted: false };
@@ -617,9 +674,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                       return (
                         <div
                           key={`${product.vendor}-${product.productName}-${index}`}
-                          className={`bg-gradient-to-br from-white to-gray-50 dark:from-slate-800 dark:to-slate-900 rounded-2xl p-6 shadow-xl border-2 ${getBorderColor(
-                            overallScore
-                          )} w-full max-w-full overflow-hidden break-words hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1`}
+                          className={`bg-gradient-to-br from-white to-gray-50 dark:from-slate-800 dark:to-slate-900 rounded-2xl p-6 shadow-xl border-2 ${getBorderColor(overallScore)} w-full max-w-full overflow-hidden break-words hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1`}
                           style={{ position: "relative" }}
                         >
                           <div className="flex items-center justify-between flex-wrap min-w-0 gap-2">
@@ -722,11 +777,11 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                       <span className="text-lg mr-2">👎</span>
                                     </Button>
                                   </div>
-                                  <Textarea 
-                                    value={fb.comment} 
-                                    onChange={(e) => setFeedbackComment(fbKey, e.target.value)} 
+                                  <Textarea
+                                    value={fb.comment}
+                                    onChange={(e) => setFeedbackComment(fbKey, e.target.value)}
                                     onKeyDown={(e) => handleFeedbackKeyDown(e, fbKey, product.vendor, product.productName)}
-                                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-base min-h-[80px]" 
+                                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-base min-h-[80px]"
                                   />
                                   <Button onClick={() => submitFeedback(fbKey, product.vendor, product.productName)} disabled={fb.loading} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white text-base font-medium">
                                     {fb.loading ? (
@@ -756,7 +811,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                 <TabsContent key={vendorName} value={vendorName} className="mt-4 min-w-0">
                   <Card className="bg-gradient-card shadow-card rounded-lg min-w-0 flex flex-col">
                     <CardHeader className="pb-3 min-w-0">
-                      
+
                     </CardHeader>
                     <CardContent className="space-y-4 min-w-0">
                       {vendorsGrouped[vendorName]
