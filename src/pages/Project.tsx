@@ -505,7 +505,7 @@ const Project = () => {
       try {
         const feedbackEntries: any[] = [];
         Object.values(tabStates).forEach((s: any) => {
-          if (s && s.feedbackEntries && Array.isArray(s.feedbackEntries)) {
+          if (s && s.feedbackEntries && Array.isArray(s.feedbackEntrieshy)) {
             feedbackEntries.push(...s.feedbackEntries);
           }
         });
@@ -521,7 +521,6 @@ const Project = () => {
       } else {
         console.log('Creating new project');
       }
-
       console.log('Saving project with comprehensive data and descriptions:', {
         fieldCount: Object.keys(projectData).length,
         hasFieldDescriptions: !!projectData.field_descriptions,
@@ -547,7 +546,8 @@ const Project = () => {
               const ranked = (activeState.analysisResult?.overallRanking?.rankedProducts) || [];
               ranked.forEach((product: any) => {
                 try {
-                  if (!product || !product.requirementsMatch) return;
+                  // Save ALL products (both exact and approximate matches)
+                  if (!product) return;
                   const vendor = product.vendor || product.vendorName || product.vendor_name || '';
                   const pname = product.productName || product.product_name || product.name || '';
                   if (!vendor && !pname) return;
@@ -568,6 +568,9 @@ const Project = () => {
 
                   if (topUrl) entry.top_image = { url: topUrl };
                   if (vLogoUrl) entry.vendor_logo = { url: vLogoUrl };
+
+                  // Add matchType metadata
+                  entry.matchType = product.requirementsMatch ? 'exact' : 'approximate';
 
                   if (Object.keys(entry).length > 0) map[key] = entry;
                 } catch (e) {
