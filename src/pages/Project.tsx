@@ -110,15 +110,18 @@ const Project = () => {
   };
 
   // Batched parallel loading: Load multiple images at once in batches
-  // This is FASTER than sequential while still respecting rate limits
+  // Collects ALL images first, then displays them all at once
   const fetchGenericImagesLazy = async (productTypes: string[]) => {
     const uniqueTypes = [...new Set(productTypes)]; // Remove duplicates
 
     // Batch configuration
-    const BATCH_SIZE = 5; // Load 3 images at a time (safe for 8/min limit)
+    const BATCH_SIZE = 5; // Load 5 images at a time (safe for 8/min limit)
     const BATCH_DELAY = 8000; // 8 seconds between batches
 
     console.log(`[PARALLEL_BATCH] Starting batched parallel load for ${uniqueTypes.length} images (batch size: ${BATCH_SIZE})...`);
+
+    // Collect all loaded images here - don't update state until ALL are loaded
+    const allLoadedImages: Record<string, string> = {};
 
     // Process images in batches
     for (let i = 0; i < uniqueTypes.length; i += BATCH_SIZE) {
@@ -145,11 +148,8 @@ const Project = () => {
             if (data.success && data.image) {
               const absoluteUrl = getAbsoluteImageUrl(data.image.url);
               if (absoluteUrl) {
-                // Update state immediately - image appears as soon as it's ready!
-                setGenericImages(prev => ({
-                  ...prev,
-                  [productType]: absoluteUrl
-                }));
+                // Store in temporary object instead of updating state immediately
+                allLoadedImages[productType] = absoluteUrl;
                 console.log(`[PARALLEL_BATCH] ✓ Loaded ${globalIndex + 1}/${uniqueTypes.length}: ${productType}`);
                 return { success: true, productType };
               }
@@ -175,7 +175,9 @@ const Project = () => {
       }
     }
 
-    console.log(`[PARALLEL_BATCH] Completed all batches!`);
+    // ALL batches complete - now update state with ALL images at once
+    console.log(`[PARALLEL_BATCH] All batches complete! Displaying ${Object.keys(allLoadedImages).length} images at once...`);
+    setGenericImages(allLoadedImages);
   };
 
   // Escape string for use in RegExp
