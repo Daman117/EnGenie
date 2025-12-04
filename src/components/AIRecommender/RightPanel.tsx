@@ -21,6 +21,16 @@ const cleanImageUrl = (url: string): string => {
   }
   return url;
 };
+
+const getAbsoluteImageUrl = (url: string | undefined | null): string | undefined => {
+  if (!url) return undefined;
+  const clean = cleanImageUrl(url);
+  if (clean.startsWith("http") || clean.startsWith("data:")) return clean;
+
+  const baseUrl = BASE_URL.endsWith("/") ? BASE_URL.slice(0, -1) : BASE_URL;
+  const path = clean.startsWith("/") ? clean : `/${clean}`;
+  return `${baseUrl}${path}`;
+};
 // Type that allows images to be either objects or strings
 type VendorImage = { fileName: string; url: string; productKey?: string } | string;
 type VendorInfo = { name: string; logoUrl: string | null; images: VendorImage[] };
@@ -61,10 +71,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, isOpen, onClose, pr
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4 max-h-[70vh] overflow-y-auto">
           {images.map((image, index) => {
-            // --- FIX APPLIED HERE for ImageGallery ---
-            const cleanUrl = cleanImageUrl(image.url);
-            const finalSrc = cleanUrl.startsWith("/") ? `${BASE_URL}${cleanUrl}` : cleanUrl;
-            // ------------------------------------------
+            const finalSrc = getAbsoluteImageUrl(image.url) || "";
 
             return (
               <div key={index} className="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden">
@@ -195,7 +202,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
     // Prefer vendor logos/images embedded in the analysisResult (for saved projects)
     if (!analysisResult?.overallRanking?.rankedProducts || vendors.length > 0) return;
 
-    const matchedProducts = analysisResult.overallRanking.rankedProducts.filter((p) => p.requirementsMatch === true);
+    // Use productsToDisplay instead of hardcoded exact match filter
+    // This ensures we show images/logos for whichever products are actually displayed (exact or approximate)
+    const matchedProducts = productsToDisplay;
 
     // Try to build vendors list from analysisResult if logos/images were saved with results
     const embeddedVendorsMap: Record<string, VendorInfo> = {};
@@ -266,7 +275,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
   useEffect(() => {
     if (!analysisResult?.overallRanking?.rankedProducts) return;
 
-    const matchedProducts = analysisResult.overallRanking.rankedProducts.filter((product) => product.requirementsMatch === true);
+    // Use productsToDisplay instead of hardcoded exact match filter
+    // This ensures we fetch pricing for whichever products are actually displayed (exact or approximate)
+    const matchedProducts = productsToDisplay;
 
     // Build a priceReviewMap but prefer embedded pricing in saved project data
     const map: Record<string, PriceReview> = {};
@@ -562,8 +573,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
     const normalizedVendorName = normalizeVendorName(vendorName);
     const logoUrl = vendorLogoMap[normalizedVendorName];
     if (!logoUrl) return null;
-    const cleanedUrl = cleanImageUrl(logoUrl);
-    const safeUrl = cleanedUrl.startsWith("/") ? `${BASE_URL}${cleanedUrl}` : cleanedUrl;
+    const safeUrl = getAbsoluteImageUrl(logoUrl);
     return (
       <img
         src={safeUrl}
@@ -664,7 +674,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                       const imageData = analysisImages[key];
                       const isLoadingImage = false;
                       const rawProductImgUrl = imageData?.topImage?.url || (product as any).topImage?.url || (product as any).top_image?.url || product.imageUrl;
-                      const productImgUrl = cleanImageUrl(rawProductImgUrl);
+                      const productImgUrl = getAbsoluteImageUrl(rawProductImgUrl);
                       const priceReviews = getPriceReview(product.vendor, product.productName);
                       const fbKey = getProductKey(product.vendor, product.productName);
                       const fb = feedbackState[fbKey] ?? { type: null, comment: "", loading: false, submitted: false };
@@ -688,7 +698,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                 ) : productImgUrl ? (
                                   <div className="relative flex-shrink-0">
                                     <img
-                                      src={productImgUrl ? (productImgUrl.startsWith("/") ? `${BASE_URL}${productImgUrl}` : productImgUrl) : undefined}
+                                      src={productImgUrl}
                                       alt={`${product.productName} thumbnail`}
                                       onMouseEnter={() => setHoveredImage(productImgUrl)}
                                       onMouseLeave={() => setHoveredImage(null)}
