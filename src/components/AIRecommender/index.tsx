@@ -514,10 +514,16 @@ const AIRecommender = ({
         ? `Found ${exactMatches.length} product${exactMatches.length !== 1 ? 's' : ''} matching all requirements`
         : `No exact matches found. Found ${approximateMatches.length} close alternative${approximateMatches.length !== 1 ? 's' : ''}`;
 
-      // ✅ Fetch images and logos for all products after analysis completes
-      if (analysis.overallRanking?.rankedProducts && analysis.overallRanking.rankedProducts.length > 0) {
+      // ✅ Fetch images ONLY for products that will be displayed
+      // If exact matches exist, fetch only for exact matches
+      // If no exact matches, fetch only for approximate matches
+      const productsToFetchImagesFor = displayMode === 'exact' ? exactMatches : approximateMatches;
+
+      if (productsToFetchImagesFor.length > 0) {
         try {
-          const imageFetchPromises = analysis.overallRanking.rankedProducts.map(async (product) => {
+          console.log(`[IMAGE_FETCH] Fetching images for ${productsToFetchImagesFor.length} ${displayMode} match products`);
+
+          const imageFetchPromises = productsToFetchImagesFor.map(async (product) => {
             if (!product.vendor || !product.productName) return product;
 
             try {
@@ -544,8 +550,14 @@ const AIRecommender = ({
 
           const productsWithImages = await Promise.all(imageFetchPromises);
 
-          // Update analysis result with products that have images
-          analysis.overallRanking.rankedProducts = productsWithImages;
+          // Update the analysis result with products that have images
+          // Replace only the products we fetched images for
+          analysis.overallRanking.rankedProducts = analysis.overallRanking.rankedProducts.map(product => {
+            const updatedProduct = productsWithImages.find(
+              p => p.vendor === product.vendor && p.productName === product.productName
+            );
+            return updatedProduct || product; // Use updated if found, otherwise keep original
+          });
 
           // Also update vendorMatches if they exist
           if (analysis.vendorAnalysis?.vendorMatches) {
@@ -560,15 +572,18 @@ const AIRecommender = ({
               }
             }
           }
+
+          console.log(`[IMAGE_FETCH] Successfully fetched images for ${productsWithImages.length} products`);
         } catch (error) {
           console.error("Error fetching product images:", error);
           // Continue even if image fetching fails
         }
+      } else {
+        console.log(`[IMAGE_FETCH] No products to fetch images for (displayMode: ${displayMode})`);
       }
 
-      const contextMessage = displayMode === 'exact'
-        ? `Analysis complete. ${message}.`
-        : `Analysis complete. ${message}. These products don't meet all mandatory requirements - please review the limitations carefully.`;
+      // Show same message for both exact and approximate matches (no warning)
+      const contextMessage = `Analysis complete. ${message}.`;
 
       const llmResponse = await generateAgentResponse(
         "finalAnalysis",
@@ -587,7 +602,7 @@ const AIRecommender = ({
       toast({
         title: "Analysis Complete",
         description: message,
-        variant: displayMode === 'exact' ? "default" : "default"  // Both use default, warning handled by banner
+        variant: "default"  // Same variant for both exact and approximate
       });
     } catch (error) {
       console.error("Analysis error:", error);
