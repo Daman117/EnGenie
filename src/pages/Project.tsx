@@ -115,7 +115,7 @@ const Project = () => {
     const uniqueTypes = [...new Set(productTypes)]; // Remove duplicates
 
     // Batch configuration
-    const BATCH_SIZE = 3; // Load 3 images at a time (safe for 8/min limit)
+    const BATCH_SIZE = 5; // Load 3 images at a time (safe for 8/min limit)
     const BATCH_DELAY = 8000; // 8 seconds between batches
 
     console.log(`[PARALLEL_BATCH] Starting batched parallel load for ${uniqueTypes.length} images (batch size: ${BATCH_SIZE})...`);
