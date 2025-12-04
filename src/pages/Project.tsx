@@ -77,7 +77,7 @@ const Project = () => {
   const [tabStates, setTabStates] = useState<Record<string, any>>({});
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuth(); // Get user info and logout function
 
   // NEW: For scroll position handling
   const projectScrollRef = useRef<HTMLDivElement | null>(null);
@@ -1424,13 +1424,12 @@ const Project = () => {
 
                   {!showResults && (
                     <div className="text-center space-y-4 mb-8">
-                      <h2 className="text-3xl font-bold">
-                        What are your requirements?
+                      <h2 className="text-2xl font-bold">
+                        Hello, {user?.username || 'User'}!{' '}
+                        <span className="text-lg font-normal text-muted-foreground">
+                          Describe your requirements below
+                        </span>
                       </h2>
-                      {/* <p className="text-muted-foreground text-lg">
-                Describe your Industrial Process Control System needs
-              </p> */}
-
                     </div>
                   )}
 
@@ -1438,7 +1437,6 @@ const Project = () => {
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="space-y-4">
                       <Textarea
-                        placeholder="Example: I need a pressure transmitter for measuring 0-100 bar with 4-20mA output and a temperature sensor for 0-200°C..."
                         value={requirements}
                         onChange={(e) => setRequirements(e.target.value)}
                         onKeyDown={handleKeyPress}
