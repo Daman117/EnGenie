@@ -109,54 +109,73 @@ const Project = () => {
     return `${baseUrl}${path}`;
   };
 
-  // Lazy load generic product type images ONE AT A TIME (non-blocking)
-  // Images appear progressively as they're fetched
+  // Batched parallel loading: Load multiple images at once in batches
+  // This is FASTER than sequential while still respecting rate limits
   const fetchGenericImagesLazy = async (productTypes: string[]) => {
     const uniqueTypes = [...new Set(productTypes)]; // Remove duplicates
 
-    console.log(`[LAZY_LOAD] Starting lazy load for ${uniqueTypes.length} images...`);
+    // Batch configuration
+    const BATCH_SIZE = 3; // Load 3 images at a time (safe for 8/min limit)
+    const BATCH_DELAY = 8000; // 8 seconds between batches
 
-    // Load images ONE AT A TIME to respect rate limits and show progressive loading
-    for (let i = 0; i < uniqueTypes.length; i++) {
-      const productType = uniqueTypes[i];
+    console.log(`[PARALLEL_BATCH] Starting batched parallel load for ${uniqueTypes.length} images (batch size: ${BATCH_SIZE})...`);
 
-      try {
-        const encodedType = encodeURIComponent(productType);
-        console.log(`[LAZY_LOAD] [${i + 1}/${uniqueTypes.length}] Fetching: ${productType}`);
+    // Process images in batches
+    for (let i = 0; i < uniqueTypes.length; i += BATCH_SIZE) {
+      const batch = uniqueTypes.slice(i, i + BATCH_SIZE);
+      const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(uniqueTypes.length / BATCH_SIZE);
 
-        const response = await fetch(`${BASE_URL}/api/generic_image/${encodedType}`, {
-          credentials: 'include'
-        });
+      console.log(`[PARALLEL_BATCH] Processing batch ${batchNumber}/${totalBatches} (${batch.length} images)...`);
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.image) {
-            // Convert relative URLs to absolute URLs for deployment compatibility
-            const absoluteUrl = getAbsoluteImageUrl(data.image.url);
-            if (absoluteUrl) {
-              // Update state immediately - image appears as soon as it's ready!
-              setGenericImages(prev => ({
-                ...prev,
-                [productType]: absoluteUrl
-              }));
-              console.log(`[LAZY_LOAD] ✓ Loaded ${i + 1}/${uniqueTypes.length}: ${productType}`);
+      // Fetch all images in this batch IN PARALLEL
+      const batchPromises = batch.map(async (productType, batchIndex) => {
+        const globalIndex = i + batchIndex;
+
+        try {
+          const encodedType = encodeURIComponent(productType);
+          console.log(`[PARALLEL_BATCH] [${globalIndex + 1}/${uniqueTypes.length}] Fetching: ${productType}`);
+
+          const response = await fetch(`${BASE_URL}/api/generic_image/${encodedType}`, {
+            credentials: 'include'
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.image) {
+              const absoluteUrl = getAbsoluteImageUrl(data.image.url);
+              if (absoluteUrl) {
+                // Update state immediately - image appears as soon as it's ready!
+                setGenericImages(prev => ({
+                  ...prev,
+                  [productType]: absoluteUrl
+                }));
+                console.log(`[PARALLEL_BATCH] ✓ Loaded ${globalIndex + 1}/${uniqueTypes.length}: ${productType}`);
+                return { success: true, productType };
+              }
             }
+          } else {
+            console.warn(`[PARALLEL_BATCH] ✗ Failed (${response.status}): ${productType}`);
           }
-        } else {
-          console.warn(`[LAZY_LOAD] ✗ Failed (${response.status}): ${productType}`);
+        } catch (error) {
+          console.error(`[PARALLEL_BATCH] ✗ Error fetching ${productType}:`, error);
         }
-      } catch (error) {
-        console.error(`[LAZY_LOAD] ✗ Error fetching ${productType}:`, error);
-      }
+        return { success: false, productType };
+      });
 
-      // Small delay between requests to respect rate limits (8 seconds for 8/min limit)
-      // Skip delay after last image
-      if (i < uniqueTypes.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 8000));
+      // Wait for all images in this batch to complete
+      const batchResults = await Promise.all(batchPromises);
+      const successCount = batchResults.filter(r => r.success).length;
+      console.log(`[PARALLEL_BATCH] Batch ${batchNumber} complete: ${successCount}/${batch.length} succeeded`);
+
+      // Wait before next batch (except for last batch)
+      if (i + BATCH_SIZE < uniqueTypes.length) {
+        console.log(`[PARALLEL_BATCH] Waiting ${BATCH_DELAY / 1000}s before next batch...`);
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
       }
     }
 
-    console.log(`[LAZY_LOAD] Completed loading all ${uniqueTypes.length} images`);
+    console.log(`[PARALLEL_BATCH] Completed all batches!`);
   };
 
   // Escape string for use in RegExp
@@ -1500,9 +1519,9 @@ const Project = () => {
                                   </Button>
                                 </div>
 
-                                {/* Generic Product Type Image with Skeleton Loading */}
-                                <div className="flex justify-center my-4">
-                                  {genericImages[instrument.productName] ? (
+                                {/* Generic Product Type Image - Only show if loaded */}
+                                {genericImages[instrument.productName] && (
+                                  <div className="flex justify-center my-4">
                                     <img
                                       src={genericImages[instrument.productName]}
                                       alt={`Generic ${instrument.category}`}
@@ -1512,12 +1531,8 @@ const Project = () => {
                                         e.currentTarget.style.display = 'none';
                                       }}
                                     />
-                                  ) : (
-                                    <div className="w-48 h-48 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 animate-pulse flex items-center justify-center">
-                                      <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                                    </div>
-                                  )}
-                                </div>
+                                  </div>
+                                )}
 
                                 {/* Specifications */}
                                 {Object.keys(instrument.specifications).length > 0 && (
@@ -1582,9 +1597,9 @@ const Project = () => {
                                   </Button>
                                 </div>
 
-                                {/* Generic Product Type Image with Skeleton Loading */}
-                                <div className="flex justify-center my-4">
-                                  {genericImages[accessory.accessoryName] ? (
+                                {/* Generic Product Type Image - Only show if loaded */}
+                                {genericImages[accessory.accessoryName] && (
+                                  <div className="flex justify-center my-4">
                                     <img
                                       src={genericImages[accessory.accessoryName]}
                                       alt={`Generic ${accessory.category}`}
@@ -1594,12 +1609,8 @@ const Project = () => {
                                         e.currentTarget.style.display = 'none';
                                       }}
                                     />
-                                  ) : (
-                                    <div className="w-48 h-48 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 animate-pulse flex items-center justify-center">
-                                      <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                                    </div>
-                                  )}
-                                </div>
+                                  </div>
+                                )}
 
                                 {/* Specifications */}
                                 {Object.keys(accessory.specifications).length > 0 && (
