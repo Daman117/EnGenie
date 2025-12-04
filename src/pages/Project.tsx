@@ -106,18 +106,18 @@ const Project = () => {
     return `${baseUrl}${path}`;
   };
 
-  // Fetch generic product type images (sequential to avoid rate limiting)
+  // Fetch generic product type images (PARALLEL for faster loading)
   const fetchGenericImages = async (productTypes: string[]) => {
     const uniqueTypes = [...new Set(productTypes)]; // Remove duplicates
     const imagesMap: Record<string, string> = {};
 
+    console.log(`[GENERIC_IMAGES] Fetching images for ${uniqueTypes.length} product types in PARALLEL...`);
 
-    // Process sequentially to avoid rate limiting on external APIs
-    for (let i = 0; i < uniqueTypes.length; i++) {
-      const productType = uniqueTypes[i];
-
+    // Process all requests in parallel for faster loading
+    const fetchPromises = uniqueTypes.map(async (productType, index) => {
       try {
         const encodedType = encodeURIComponent(productType);
+        console.log(`[GENERIC_IMAGES] [${index + 1}/${uniqueTypes.length}] Fetching: ${productType}`);
 
         const response = await fetch(`${BASE_URL}/api/generic_image/${encodedType}`, {
           credentials: 'include'
@@ -129,7 +129,8 @@ const Project = () => {
             // Convert relative URLs to absolute URLs for deployment compatibility
             const absoluteUrl = getAbsoluteImageUrl(data.image.url);
             if (absoluteUrl) {
-              imagesMap[productType] = absoluteUrl;
+              console.log(`[GENERIC_IMAGES] ✓ Success: ${productType}`);
+              return { productType, url: absoluteUrl };
             }
           }
         } else {
@@ -138,12 +139,18 @@ const Project = () => {
       } catch (error) {
         console.error(`[GENERIC_IMAGES] ✗ Error fetching ${productType}:`, error);
       }
+      return null;
+    });
 
-      // Add delay between requests to avoid rate limiting (except for last item)
-      if (i < uniqueTypes.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
+    // Wait for all requests to complete
+    const results = await Promise.all(fetchPromises);
+
+    // Build the images map from successful results
+    results.forEach(result => {
+      if (result) {
+        imagesMap[result.productType] = result.url;
       }
-    }
+    });
 
     console.log(`[GENERIC_IMAGES] Completed: ${Object.keys(imagesMap).length}/${uniqueTypes.length} images fetched`);
     setGenericImages(imagesMap);
@@ -223,17 +230,17 @@ const Project = () => {
         setProjectName(response.projectName);
       }
 
-      // Fetch generic images for identified product types
-      const productTypes: string[] = [];
+      // Fetch generic images for identified product names (not categories)
+      const productNames: string[] = [];
       (response.instruments || []).forEach((inst: any) => {
-        if (inst.category) productTypes.push(inst.category);
+        if (inst.productName) productNames.push(inst.productName);
       });
       (response.accessories || []).forEach((acc: any) => {
-        if (acc.category) productTypes.push(acc.category);
+        if (acc.accessoryName) productNames.push(acc.accessoryName);
       });
 
-      if (productTypes.length > 0) {
-        fetchGenericImages(productTypes);
+      if (productNames.length > 0) {
+        fetchGenericImages(productNames);
       }
 
       toast({
@@ -1443,10 +1450,10 @@ const Project = () => {
                               </div>
 
                               {/* Generic Product Type Image */}
-                              {genericImages[instrument.category] && (
+                              {genericImages[instrument.productName] && (
                                 <div className="flex justify-center my-4">
                                   <img
-                                    src={genericImages[instrument.category]}
+                                    src={genericImages[instrument.productName]}
                                     alt={`Generic ${instrument.category}`}
                                     className="w-48 h-48 object-contain rounded-lg shadow-md"
                                     onError={(e) => {
@@ -1516,10 +1523,10 @@ const Project = () => {
                               </div>
 
                               {/* Generic Product Type Image */}
-                              {genericImages[accessory.category] && (
+                              {genericImages[accessory.accessoryName] && (
                                 <div className="flex justify-center my-4">
                                   <img
-                                    src={genericImages[accessory.category]}
+                                    src={genericImages[accessory.accessoryName]}
                                     alt={`Generic ${accessory.category}`}
                                     className="w-48 h-48 object-contain rounded-lg shadow-md"
                                     onError={(e) => {
