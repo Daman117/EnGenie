@@ -86,6 +86,9 @@ const Project = () => {
   // NEW: For generic product type images
   const [genericImages, setGenericImages] = useState<Record<string, string>>({});
 
+  // NEW: For greeting/question responses
+  const [responseMessage, setResponseMessage] = useState<string>('');
+
   const capitalizeFirstLetter = (str?: string): string => {
     if (!str) return "";
     return str.charAt(0).toUpperCase() + str.slice(1);
@@ -106,18 +109,20 @@ const Project = () => {
     return `${baseUrl}${path}`;
   };
 
-  // Fetch generic product type images (PARALLEL for faster loading)
-  const fetchGenericImages = async (productTypes: string[]) => {
+  // Lazy load generic product type images ONE AT A TIME (non-blocking)
+  // Images appear progressively as they're fetched
+  const fetchGenericImagesLazy = async (productTypes: string[]) => {
     const uniqueTypes = [...new Set(productTypes)]; // Remove duplicates
-    const imagesMap: Record<string, string> = {};
 
-    console.log(`[GENERIC_IMAGES] Fetching images for ${uniqueTypes.length} product types in PARALLEL...`);
+    console.log(`[LAZY_LOAD] Starting lazy load for ${uniqueTypes.length} images...`);
 
-    // Process all requests in parallel for faster loading
-    const fetchPromises = uniqueTypes.map(async (productType, index) => {
+    // Load images ONE AT A TIME to respect rate limits and show progressive loading
+    for (let i = 0; i < uniqueTypes.length; i++) {
+      const productType = uniqueTypes[i];
+
       try {
         const encodedType = encodeURIComponent(productType);
-        console.log(`[GENERIC_IMAGES] [${index + 1}/${uniqueTypes.length}] Fetching: ${productType}`);
+        console.log(`[LAZY_LOAD] [${i + 1}/${uniqueTypes.length}] Fetching: ${productType}`);
 
         const response = await fetch(`${BASE_URL}/api/generic_image/${encodedType}`, {
           credentials: 'include'
@@ -129,31 +134,29 @@ const Project = () => {
             // Convert relative URLs to absolute URLs for deployment compatibility
             const absoluteUrl = getAbsoluteImageUrl(data.image.url);
             if (absoluteUrl) {
-              console.log(`[GENERIC_IMAGES] ✓ Success: ${productType}`);
-              return { productType, url: absoluteUrl };
+              // Update state immediately - image appears as soon as it's ready!
+              setGenericImages(prev => ({
+                ...prev,
+                [productType]: absoluteUrl
+              }));
+              console.log(`[LAZY_LOAD] ✓ Loaded ${i + 1}/${uniqueTypes.length}: ${productType}`);
             }
           }
         } else {
-          console.warn(`[GENERIC_IMAGES] ✗ Failed (${response.status}): ${productType}`);
+          console.warn(`[LAZY_LOAD] ✗ Failed (${response.status}): ${productType}`);
         }
       } catch (error) {
-        console.error(`[GENERIC_IMAGES] ✗ Error fetching ${productType}:`, error);
+        console.error(`[LAZY_LOAD] ✗ Error fetching ${productType}:`, error);
       }
-      return null;
-    });
 
-    // Wait for all requests to complete
-    const results = await Promise.all(fetchPromises);
-
-    // Build the images map from successful results
-    results.forEach(result => {
-      if (result) {
-        imagesMap[result.productType] = result.url;
+      // Small delay between requests to respect rate limits (8 seconds for 8/min limit)
+      // Skip delay after last image
+      if (i < uniqueTypes.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 8000));
       }
-    });
+    }
 
-    console.log(`[GENERIC_IMAGES] Completed: ${Object.keys(imagesMap).length}/${uniqueTypes.length} images fetched`);
-    setGenericImages(imagesMap);
+    console.log(`[LAZY_LOAD] Completed loading all ${uniqueTypes.length} images`);
   };
 
   // Escape string for use in RegExp
@@ -219,38 +222,69 @@ const Project = () => {
     }
 
     setIsLoading(true);
+    // Clear previous response message
+    setResponseMessage('');
+
     try {
       const response = await identifyInstruments(requirements);
-      setInstruments(response.instruments || []);
-      setAccessories(response.accessories || []);
-      setShowResults(true);
 
-      // Set the project name from the API response, fallback to 'Project' if not provided
-      if (response.projectName) {
-        setProjectName(response.projectName);
+      // Check response type
+      const responseType = (response as any).responseType || (response as any).response_type;
+
+      // CASE 1: Greeting response - Show message below smaller input box
+      if (responseType === 'greeting') {
+        setResponseMessage((response as any).message || '');
+        setShowResults(true); // Make input box smaller, consistent with requirements
+        setInstruments([]);
+        setAccessories([]);
+        return;
       }
 
-      // Fetch generic images for identified product names (not categories)
-      const productNames: string[] = [];
-      (response.instruments || []).forEach((inst: any) => {
-        if (inst.productName) productNames.push(inst.productName);
-      });
-      (response.accessories || []).forEach((acc: any) => {
-        if (acc.accessoryName) productNames.push(acc.accessoryName);
-      });
-
-      if (productNames.length > 0) {
-        fetchGenericImages(productNames);
+      // CASE 2: Question response - Show message below smaller input box
+      if (responseType === 'question') {
+        setResponseMessage((response as any).message || '');
+        setShowResults(true); // Make input box smaller, consistent with requirements
+        setInstruments([]);
+        setAccessories([]);
+        return;
       }
 
-      toast({
-        title: "Success",
-        description: `Identified ${response.instruments?.length || 0} instruments and ${response.accessories?.length || 0} accessories`,
-      });
+      // CASE 3: Requirements response (instruments and accessories)
+      if (responseType === 'requirements') {
+        setInstruments(response.instruments || []);
+        setAccessories(response.accessories || []);
+        setShowResults(true);
+        setResponseMessage(''); // Clear any previous message
+
+        // Set the project name from the API response, fallback to 'Project' if not provided
+        if (response.projectName) {
+          setProjectName(response.projectName);
+        }
+
+        // Lazy load generic images in BACKGROUND (non-blocking)
+        // Images will appear progressively as they're fetched
+        const productNames: string[] = [];
+        (response.instruments || []).forEach((inst: any) => {
+          if (inst.productName) productNames.push(inst.productName);
+        });
+        (response.accessories || []).forEach((acc: any) => {
+          if (acc.accessoryName) productNames.push(acc.accessoryName);
+        });
+
+        if (productNames.length > 0) {
+          // This runs asynchronously - doesn't block UI
+          fetchGenericImagesLazy(productNames);
+        }
+
+        toast({
+          title: "Success",
+          description: `Identified ${response.instruments?.length || 0} instruments and ${response.accessories?.length || 0} accessories`,
+        });
+      }
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to identify instruments",
+        description: error.message || "Failed to process request",
         variant: "destructive",
       });
     } finally {
@@ -333,6 +367,7 @@ const Project = () => {
     setInstruments([]);
     setAccessories([]);
     setRequirements('');
+    setResponseMessage(''); // Clear any greeting/question responses
     setSearchTabs([]);
     setPreviousTab('project');
     setActiveTab('project');
@@ -1413,157 +1448,187 @@ const Project = () => {
                     </div>
                   </form>
 
+                  {/* Response Message Display (for greetings and questions) */}
+                  {responseMessage && (
+                    <div className="mt-6 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl shadow-md">
+                      <div className="flex items-start gap-3">
+                        {/* <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                          <Bot className="h-6 w-6 text-white" />
+                        </div> */}
+                        <div className="flex-1">
+                          {/* <h3 className="text-lg font-semibold text-gray-900 mb-2">Engenie</h3> */}
+                          <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{responseMessage}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Results Display (shown below input when available) */}
                   {showResults && (
                     <div className="space-y-6 mt-6">
-                      <div className="mb-6">
-                        <h2 className="text-2xl font-bold">
-                          Instruments ({instruments.length})
-                        </h2>
-                      </div>
-
-                      {/* Instruments Section */}
+                      {/* Instruments Section - Only show if there are instruments */}
                       {instruments.length > 0 && (
-                        <div className="space-y-4">
-                          {instruments.map((instrument, index) => (
-                            <div
-                              key={index}
-                              className="border rounded-xl p-6 space-y-4 hover:shadow-lg transition-shadow"
-                            >
-                              {/* Category and Product Name */}
-                              <div className="flex items-start justify-between">
-                                <div className="space-y-1">
-                                  <h3 className="text-xl font-semibold">
-                                    {index + 1}. {instrument.category}{instrument.quantity ? ` (${instrument.quantity})` : ''}
-                                  </h3>
-                                  <p className="text-muted-foreground">
-                                    {instrument.productName}
+                        <>
+                          <div className="mb-6">
+                            <h2 className="text-2xl font-bold">
+                              Instruments ({instruments.length})
+                            </h2>
+                          </div>
+
+                          <div className="space-y-4">
+                            {instruments.map((instrument, index) => (
+                              <div
+                                key={index}
+                                className="border rounded-xl p-6 space-y-4 hover:shadow-lg transition-shadow"
+                              >
+                                {/* Category and Product Name */}
+                                <div className="flex items-start justify-between">
+                                  <div className="space-y-1">
+                                    <h3 className="text-xl font-semibold">
+                                      {index + 1}. {instrument.category}{instrument.quantity ? ` (${instrument.quantity})` : ''}
+                                    </h3>
+                                    <p className="text-muted-foreground">
+                                      {instrument.productName}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    onClick={() => handleRun(instrument, index)}
+                                    className="btn-primary rounded-xl px-6"
+                                  >
+                                    <Play className="mr-2 h-4 w-4" />
+                                    Search
+                                  </Button>
+                                </div>
+
+                                {/* Generic Product Type Image with Skeleton Loading */}
+                                <div className="flex justify-center my-4">
+                                  {genericImages[instrument.productName] ? (
+                                    <img
+                                      src={genericImages[instrument.productName]}
+                                      alt={`Generic ${instrument.category}`}
+                                      className="w-48 h-48 object-contain rounded-lg shadow-md"
+                                      onError={(e) => {
+                                        // Hide image if it fails to load
+                                        e.currentTarget.style.display = 'none';
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-48 h-48 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 animate-pulse flex items-center justify-center">
+                                      <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Specifications */}
+                                {Object.keys(instrument.specifications).length > 0 && (
+                                  <div className="space-y-2">
+                                    <h4 className="font-medium text-sm text-muted-foreground">
+                                      Specifications:
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-3">
+                                      {Object.entries(instrument.specifications).map(([key, value]) => (
+                                        <div key={key} className="text-sm">
+                                          <span className="font-medium">{key}:</span>{' '}
+                                          <span className="text-muted-foreground">{value}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Sample Input Preview */}
+                                <div className="pt-3 border-t">
+                                  <p className="text-xs text-muted-foreground mb-2">Sample Input:</p>
+                                  <p className="text-sm bg-muted p-3 rounded-lg font-mono">
+                                    {instrument.sampleInput}
                                   </p>
                                 </div>
-                                <Button
-                                  onClick={() => handleRun(instrument, index)}
-                                  className="btn-primary rounded-xl px-6"
-                                >
-                                  <Play className="mr-2 h-4 w-4" />
-                                  Search
-                                </Button>
                               </div>
-
-                              {/* Generic Product Type Image */}
-                              {genericImages[instrument.productName] && (
-                                <div className="flex justify-center my-4">
-                                  <img
-                                    src={genericImages[instrument.productName]}
-                                    alt={`Generic ${instrument.category}`}
-                                    className="w-48 h-48 object-contain rounded-lg shadow-md"
-                                    onError={(e) => {
-                                      // Hide image if it fails to load
-                                      e.currentTarget.style.display = 'none';
-                                    }}
-                                  />
-                                </div>
-                              )}
-
-                              {/* Specifications */}
-                              {Object.keys(instrument.specifications).length > 0 && (
-                                <div className="space-y-2">
-                                  <h4 className="font-medium text-sm text-muted-foreground">
-                                    Specifications:
-                                  </h4>
-                                  <div className="grid grid-cols-2 gap-3">
-                                    {Object.entries(instrument.specifications).map(([key, value]) => (
-                                      <div key={key} className="text-sm">
-                                        <span className="font-medium">{key}:</span>{' '}
-                                        <span className="text-muted-foreground">{value}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Sample Input Preview */}
-                              <div className="pt-3 border-t">
-                                <p className="text-xs text-muted-foreground mb-2">Sample Input:</p>
-                                <p className="text-sm bg-muted p-3 rounded-lg font-mono">
-                                  {instrument.sampleInput}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                            ))}
+                          </div>
+                        </>
                       )}
-                      <h2 className="text-2xl font-bold">
-                        Accessories ({accessories.length})
-                      </h2>
-                      {/* Accessories Section */}
+
+
+                      {/* Accessories Section - Only show if there are accessories */}
                       {accessories.length > 0 && (
-                        <div className="space-y-4 mt-8">
-                          {accessories.map((accessory, index) => (
-                            <div
-                              key={index}
-                              className="border border-dashed rounded-xl p-6 space-y-4 hover:shadow-lg transition-shadow bg-muted/30"
-                            >
-                              {/* Category and Accessory Name */}
-                              <div className="flex items-start justify-between">
-                                <div className="space-y-1">
-                                  <h3 className="text-xl font-semibold">
-                                    {index + 1}. {accessory.category}{accessory.quantity ? ` (${accessory.quantity})` : ''}
-                                  </h3>
-                                  <p className="text-muted-foreground">
-                                    {accessory.accessoryName}
+                        <>
+                          <h2 className="text-2xl font-bold">
+                            Accessories ({accessories.length})
+                          </h2>
+
+                          <div className="space-y-4 mt-8">
+                            {accessories.map((accessory, index) => (
+                              <div
+                                key={index}
+                                className="border border-dashed rounded-xl p-6 space-y-4 hover:shadow-lg transition-shadow bg-muted/30"
+                              >
+                                {/* Category and Accessory Name */}
+                                <div className="flex items-start justify-between">
+                                  <div className="space-y-1">
+                                    <h3 className="text-xl font-semibold">
+                                      {index + 1}. {accessory.category}{accessory.quantity ? ` (${accessory.quantity})` : ''}
+                                    </h3>
+                                    <p className="text-muted-foreground">
+                                      {accessory.accessoryName}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    onClick={() => handleRunAccessory(accessory, index)}
+                                    className="btn-primary rounded-xl px-6"
+                                  >
+                                    <Play className="mr-2 h-4 w-4" />
+                                    Search
+                                  </Button>
+                                </div>
+
+                                {/* Generic Product Type Image with Skeleton Loading */}
+                                <div className="flex justify-center my-4">
+                                  {genericImages[accessory.accessoryName] ? (
+                                    <img
+                                      src={genericImages[accessory.accessoryName]}
+                                      alt={`Generic ${accessory.category}`}
+                                      className="w-48 h-48 object-contain rounded-lg shadow-md"
+                                      onError={(e) => {
+                                        // Hide image if it fails to load
+                                        e.currentTarget.style.display = 'none';
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-48 h-48 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 animate-pulse flex items-center justify-center">
+                                      <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Specifications */}
+                                {Object.keys(accessory.specifications).length > 0 && (
+                                  <div className="space-y-2">
+                                    <h4 className="font-medium text-sm text-muted-foreground">
+                                      Specifications:
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-3">
+                                      {Object.entries(accessory.specifications).map(([key, value]) => (
+                                        <div key={key} className="text-sm">
+                                          <span className="font-medium">{key}:</span>{' '}
+                                          <span className="text-muted-foreground">{value}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Sample Input Preview */}
+                                <div className="pt-3 border-t">
+                                  <p className="text-xs text-muted-foreground mb-2">Sample Input:</p>
+                                  <p className="text-sm bg-muted p-3 rounded-lg font-mono">
+                                    {accessory.sampleInput}
                                   </p>
                                 </div>
-                                <Button
-                                  onClick={() => handleRunAccessory(accessory, index)}
-                                  className="btn-primary rounded-xl px-6"
-                                >
-                                  <Play className="mr-2 h-4 w-4" />
-                                  Search
-                                </Button>
                               </div>
-
-                              {/* Generic Product Type Image */}
-                              {genericImages[accessory.accessoryName] && (
-                                <div className="flex justify-center my-4">
-                                  <img
-                                    src={genericImages[accessory.accessoryName]}
-                                    alt={`Generic ${accessory.category}`}
-                                    className="w-48 h-48 object-contain rounded-lg shadow-md"
-                                    onError={(e) => {
-                                      // Hide image if it fails to load
-                                      e.currentTarget.style.display = 'none';
-                                    }}
-                                  />
-                                </div>
-                              )}
-
-                              {/* Specifications */}
-                              {Object.keys(accessory.specifications).length > 0 && (
-                                <div className="space-y-2">
-                                  <h4 className="font-medium text-sm text-muted-foreground">
-                                    Specifications:
-                                  </h4>
-                                  <div className="grid grid-cols-2 gap-3">
-                                    {Object.entries(accessory.specifications).map(([key, value]) => (
-                                      <div key={key} className="text-sm">
-                                        <span className="font-medium">{key}:</span>{' '}
-                                        <span className="text-muted-foreground">{value}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Sample Input Preview */}
-                              <div className="pt-3 border-t">
-                                <p className="text-xs text-muted-foreground mb-2">Sample Input:</p>
-                                <p className="text-sm bg-muted p-3 rounded-lg font-mono">
-                                  {accessory.sampleInput}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                            ))}
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
